@@ -3,10 +3,9 @@ import { supabase } from "./supabase";
 // Mock seed data matching the prototype exactly
 const INITIAL_SEED = {
   users: [
-    { id: 1, name: 'Asha Rao', role: 'admin', roleLabel: 'Admin' },
-    { id: 2, name: 'Manoj Iyer', role: 'inv_sup', roleLabel: 'Inventory Supervisor' },
-    { id: 3, name: 'Ravi Kumar', role: 'operator', roleLabel: 'Operator' },
-    { id: 4, name: 'Divya Shah', role: 'viewer', roleLabel: 'Viewer' }
+    { id: 1, name: 'Sharun', role: 'admin', roleLabel: 'Admin' },
+    { id: 2, name: 'Deepika', role: 'inv_sup', roleLabel: 'Inventory Supervisor' },
+    { id: 3, name: 'Narend', role: 'operator', roleLabel: 'Operator' }
   ],
   legalEntities: [
     { id: 1, name: 'Maradi Zari Works Pvt Ltd', gstin: '29AAMCM1234F1Z8', state_code: '29', state_name: 'Karnataka' }
@@ -154,6 +153,19 @@ export const db = {
     }
     saveState(localDB);
     return record;
+  },
+
+  delete: async (key, idValue, idKey = "id") => {
+    if (supabase) {
+      const { data, error } = await supabase.from(key).delete().eq(idKey, idValue);
+      if (error) throw error;
+      return data;
+    }
+
+    if (localDB[key]) {
+      localDB[key] = localDB[key].filter((item) => String(item[idKey]) !== String(idValue));
+      saveState(localDB);
+    }
   },
 
   // Reset database state (mostly for demo purposes)
