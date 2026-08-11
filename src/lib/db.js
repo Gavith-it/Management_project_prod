@@ -104,35 +104,215 @@ function saveState(state) {
 // In-memory cache when running in LocalStorage mode
 let localDB = loadState();
 
+const TABLE_MAP = {
+  users: "profiles",
+  legalEntities: "legal_entities",
+  itemGstRates: "item_gst_rates",
+  stageOutputMap: "stage_output_maps",
+  stageOutputMaps: "stage_output_maps",
+  productionSpaces: "production_spaces",
+  stockLedger: "stock_ledger",
+  wasteEntries: "waste_entries",
+  productionIssues: "production_issues",
+  jobCards: "job_cards",
+  warpingLogs: "warping_logs",
+  stageCompletions: "stage_completions",
+  jobCardCompletions: "job_card_completions",
+  sourceBatches: "source_batches",
+  auditLog: "audit_log",
+  stocktake: "stocktakes"
+};
+
+const TABLE_COLUMNS = {
+  profiles: ["id", "name", "role", "role_label", "created_at"],
+  legal_entities: ["id", "name", "gstin", "state_code", "state_name"],
+  suppliers: ["name", "state_code", "state_name", "gstin", "address", "payment_terms"],
+  items: ["id", "name", "code", "type", "uom", "hsn"],
+  item_gst_rates: ["id", "item", "rate_pct", "effective_from", "effective_to"],
+  stage_output_maps: ["id", "stage", "input_item", "output_item", "waste_item"],
+  locations: ["id", "name", "code"],
+  production_spaces: ["id", "name", "code"],
+  carriers: ["code", "type", "empty_g"],
+  purchases: [
+    "id", "batch", "supplier", "invoice_no", "invoice_date", "status", "uom", "qty",
+    "empty_per_unit_g", "gross_per_unit_g", "net_per_unit_g", "net_g", "rate_per_unit",
+    "goods_value", "freight", "taxable", "cgst", "sgst", "igst", "gst_type", "total",
+    "cost_per_gram", "remarks", "invoice_file", "reversal"
+  ],
+  lots: [
+    "id", "item", "location", "parent", "source", "batch", "qty_pieces", "piece_uom",
+    "is_mixed_batch", "carrier_code", "landed_cost_per_gram", "status", "is_partial"
+  ],
+  stock_ledger: ["id", "ts", "lot", "item", "qty_g", "type", "ref", "location"],
+  waste_entries: ["id", "ts", "stage", "item", "qty_g", "ref", "location"],
+  production_issues: ["id", "machine", "operator", "status", "date", "qty_g", "lot", "remarks"],
+  production_issue_lines: ["id", "issue_id", "lot", "qty_g"],
+  job_cards: [
+    "id", "issue_id", "carrier", "type", "ends", "length_m", "width_in", "saree_design",
+    "loom_no", "operator", "empty_g", "filled_g", "paper_g", "output_g", "waste_g",
+    "consumed_g", "status"
+  ],
+  warping_logs: [
+    "id", "job_card", "operator", "bobbins", "ns_a", "fp_a", "eb_a", "gross_a",
+    "ns_b", "fp_b", "eb_b", "gross_b", "net_a", "net_b", "total_net_g", "waste_g", "created_at"
+  ],
+  returns: ["id", "status", "is_partial", "lot", "bobbins", "gross_g", "tare_g", "net_g"],
+  return_lines: ["id", "return_id", "lot", "item", "bobbins", "gross_g", "tare_g", "net_g"],
+  warping_close: ["id", "issued_g", "output_g", "waste_g", "returned_g", "variance_g", "variance_pct", "tolerance_pct", "status", "reason"],
+  stage_completions: [
+    "id", "stage", "issue_id", "from_lot", "to_lot", "machine", "issued_g", "output_g",
+    "waste_g", "returned_g", "variance_g", "variance_pct", "tolerance_pct", "status",
+    "is_mixed_batch", "sources", "pieces_note", "reason"
+  ],
+  stocktakes: ["id", "status", "location", "finalized_at", "approved_at", "approved_by"],
+  stocktake_lines: ["id", "stocktake_id", "lot", "system_g", "counted_g", "variance_g"],
+  audit_log: ["id", "ts", "actor", "action", "ref"]
+};
+
+const COLUMN_FIELD_MAP = {
+  roleLabel: "role_label",
+  finalizedAt: "finalized_at",
+  approvedAt: "approved_at",
+  approvedBy: "approved_by"
+};
+
+const isUUID = (str) => /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/.test(String(str));
+
+const toSnakeCaseRecord = (tableName, record) => {
+  const allowedCols = TABLE_COLUMNS[tableName];
+  if (!allowedCols) return record;
+  const cleaned = {};
+  for (const k in record) {
+    const dbKey = COLUMN_FIELD_MAP[k] || k;
+    if (allowedCols.includes(dbKey)) {
+      cleaned[dbKey] = record[k];
+    }
+  }
+  return cleaned;
+};
+
+const fromSnakeCaseRow = (row) => {
+  if (!row) return row;
+  const mapped = { ...row };
+  if (row.role_label !== undefined) mapped.roleLabel = row.role_label;
+  if (row.finalized_at !== undefined) mapped.finalizedAt = row.finalized_at;
+  if (row.approved_at !== undefined) mapped.approvedAt = row.approved_at;
+  if (row.approved_by !== undefined) mapped.approvedBy = row.approved_by;
+  return mapped;
+};
+
 export const db = {
   isSupabase: () => !!supabase,
 
   // --- GENERIC GETTERS / MUTATORS ---
   get: async (key) => {
-    if (supabase) {
-      const { data, error } = await supabase.from(key).select("*");
-      if (error) throw error;
-      return data;
+    // 1. Stocktake special handling
+    if (key === "stocktake") {
+      if (supabase) {
+        const { data: stData, error: stErr } = await supabase.from("stocktakes").select("*").order("id", { ascending: false });
+        if (stErr) throw stErr;
+        if (!stData || stData.length === 0) {
+          return { status: "not_started", location: null, lines: [], finalizedAt: null, approvedAt: null, approvedBy: null };
+        }
+        const activeSt = stData[0];
+        const { data: linesData, error: linesErr } = await supabase.from("stocktake_lines").select("*").eq("stocktake_id", activeSt.id);
+        if (linesErr) throw linesErr;
+        
+        return {
+          status: activeSt.status,
+          location: activeSt.location,
+          finalizedAt: activeSt.finalized_at,
+          approvedAt: activeSt.approved_at,
+          approvedBy: activeSt.approved_by,
+          lines: (linesData || []).map(l => ({
+            lot: l.lot,
+            system_g: Number(l.system_g),
+            counted_g: Number(l.counted_g),
+            variance_g: Number(l.variance_g)
+          }))
+        };
+      }
+      return localDB.stocktake || { status: "not_started", location: null, lines: [], finalizedAt: null, approvedAt: null, approvedBy: null };
     }
+
+    // 2. Generic supabase table mapping
+    const tableName = TABLE_MAP[key] || key;
+    if (supabase && TABLE_COLUMNS[tableName]) {
+      const { data, error } = await supabase.from(tableName).select("*");
+      if (error) throw error;
+      return (data || []).map(fromSnakeCaseRow);
+    }
+
     return localDB[key] || [];
   },
 
   save: async (key, record, idKey = "id", customId = null) => {
-    if (supabase) {
-      // Supabase mutation logic
+    // 1. Stocktake special handling
+    if (key === "stocktake") {
+      const idVal = "STK-CURRENT";
+      if (supabase) {
+        const row = {
+          id: idVal,
+          status: record.status,
+          location: record.location,
+          finalized_at: record.finalizedAt,
+          approved_at: record.approvedAt,
+          approved_by: record.approvedBy
+        };
+        const { error: stErr } = await supabase.from("stocktakes").upsert(row);
+        if (stErr) throw stErr;
+
+        await supabase.from("stocktake_lines").delete().eq("stocktake_id", idVal);
+        if (record.lines && record.lines.length > 0) {
+          const linesToInsert = record.lines.map(l => ({
+            stocktake_id: idVal,
+            lot: l.lot,
+            system_g: l.system_g,
+            counted_g: l.counted_g,
+            variance_g: l.variance_g
+          }));
+          const { error: linesErr } = await supabase.from("stocktake_lines").insert(linesToInsert);
+          if (linesErr) throw linesErr;
+        }
+        return record;
+      }
+      localDB.stocktake = record;
+      saveState(localDB);
+      return record;
+    }
+
+    // 2. Generic supabase table mapping
+    const tableName = TABLE_MAP[key] || key;
+    if (supabase && TABLE_COLUMNS[tableName]) {
+      // Profiles UUID protection
+      const recordId = customId || record[idKey];
+      if (tableName === "profiles" && recordId !== undefined && !isUUID(recordId)) {
+        // Fall back to local DB for non-UUID users/profiles
+        if (!localDB[key]) localDB[key] = [];
+        const list = localDB[key];
+        const idx = list.findIndex((item) => String(item[idKey]) === String(recordId));
+        if (idx > -1) {
+          list[idx] = { ...list[idx], ...record };
+        } else {
+          list.push(record);
+        }
+        saveState(localDB);
+        return record;
+      }
+
+      const cleaned = toSnakeCaseRecord(tableName, record);
       let query;
       if (customId || record[idKey]) {
-        const idVal = customId || record[idKey];
-        query = supabase.from(key).upsert(record);
+        query = supabase.from(tableName).upsert(cleaned);
       } else {
-        query = supabase.from(key).insert(record);
+        query = supabase.from(tableName).insert(cleaned);
       }
       const { data, error } = await query.select();
       if (error) throw error;
-      return data[0];
+      return fromSnakeCaseRow(data[0]);
     }
 
-    // Local Storage logic
+    // Local Storage fallback
     if (!localDB[key]) localDB[key] = [];
     const list = localDB[key];
     const matchId = customId || record[idKey];
@@ -145,7 +325,6 @@ export const db = {
         list.push(record);
       }
     } else {
-      // Auto increment serial id if id is serial
       const numericIds = list.map((item) => Number(item[idKey]) || 0);
       const maxId = numericIds.length ? Math.max(...numericIds) : 0;
       record[idKey] = maxId + 1;
@@ -156,8 +335,17 @@ export const db = {
   },
 
   delete: async (key, idValue, idKey = "id") => {
-    if (supabase) {
-      const { data, error } = await supabase.from(key).delete().eq(idKey, idValue);
+    const tableName = TABLE_MAP[key] || key;
+    if (supabase && TABLE_COLUMNS[tableName]) {
+      if (tableName === "profiles" && !isUUID(idValue)) {
+        // Delete local profile
+        if (localDB[key]) {
+          localDB[key] = localDB[key].filter((item) => String(item[idKey]) !== String(idValue));
+          saveState(localDB);
+        }
+        return;
+      }
+      const { data, error } = await supabase.from(tableName).delete().eq(idKey, idValue);
       if (error) throw error;
       return data;
     }
