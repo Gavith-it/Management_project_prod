@@ -40,7 +40,12 @@ export default function MastersPage() {
     try {
       const dbState = {};
       for (const cat of CATEGORIES) {
-        dbState[cat.entity] = await db.get(cat.entity);
+        try {
+          dbState[cat.entity] = await db.get(cat.entity);
+        } catch (err) {
+          console.error(`Failed to load master category ${cat.entity}:`, err);
+          dbState[cat.entity] = []; // Fallback to empty array if query fails
+        }
       }
       setData(dbState);
       setLoading(false);
