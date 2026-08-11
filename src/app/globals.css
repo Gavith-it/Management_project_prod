@@ -1147,34 +1147,70 @@ td.num, th.num {
   }
   .office-sidebar {
     width: 100%;
+    height: auto;
+    position: sticky;
+    top: 0;
     flex-direction: row;
     align-items: center;
     border-right: none;
-    border-bottom: 1px solid var(--neutral-200);
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
     overflow-x: auto;
-    padding: 10px 14px;
+    padding: 8px 12px;
+    z-index: 100;
   }
-  .office-brand {
-    padding: 0 10px 0 0;
-    font-size: 14px;
+  .office-brand-wrap {
+    padding: 0;
+    margin-right: 12px;
+    gap: 6px;
+    flex-shrink: 0;
   }
-  .office-brand .dot {
-    width: 7px;
-    height: 7px;
+  .office-brand-logo {
+    width: 28px;
+    height: 28px;
+  }
+  .office-brand-logo img {
+    width: 18px !important;
+    height: 18px !important;
+  }
+  .office-brand-text .title {
+    font-size: 12px;
+  }
+  .office-brand-text .sub {
+    display: none;
   }
   .office-nav {
+    margin-top: 0 !important;
     flex-direction: row;
     gap: 4px;
+    overflow-x: auto;
+    white-space: nowrap;
+    scrollbar-width: none; /* Hide scrollbar for clean horizontal nav list */
+  }
+  .office-nav::-webkit-scrollbar {
+    display: none;
+  }
+  .office-nav a {
+    display: inline-block;
   }
   .office-nav button {
     padding: 6px 10px;
     white-space: nowrap;
     width: auto;
+    font-size: 12.5px;
   }
   .office-footer {
     display: none;
   }
   .office-main {
-    padding: 18px 16px 48px;
+    padding: 14px 12px 48px;
+  }
+  
+  /* Modals responsiveness */
+  .modal-overlay {
+    padding: 20px 10px;
+  }
+  .modal {
+    margin: auto 12px !important;
+    max-width: calc(100% - 24px) !important;
   }
 }
