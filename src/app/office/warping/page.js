@@ -986,123 +986,166 @@ export default function WarpingPage() {
           {formState._jcCreate && (
             <div className="modal-overlay" onClick={() => setFormState({})}>
               <div className="modal" style={{ maxWidth: "560px" }} onClick={(e) => e.stopPropagation()}>
-                <h3>Create job card</h3>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "14px" }}>
+                  <h3 style={{ margin: 0 }}>Create job card</h3>
+                  <input
+                    type="date"
+                    value={formState.jc_date}
+                    onChange={(e) => setFormState({ ...formState, jc_date: e.target.value })}
+                    style={{ width: "160px", padding: "6px 10px", fontSize: "13px" }}
+                  />
+                </div>
                 {formErrors.jobcard && (
-                  <div className="banner banner-danger" style={{ marginTop: "10px" }}>
+                  <div className="banner banner-danger" style={{ marginBottom: "12px" }}>
                     <Icon name="alert" size={18} />
                     <div>{formErrors.jobcard}</div>
                   </div>
                 )}
-                <form onSubmit={(e) => { e.preventDefault(); handleJcSubmit("in_progress"); }} style={{ marginTop: "14px" }}>
-                  <div className="field">
-                    <label>Job card no.</label>
-                    <input value={`JC-${String(jobCards.length + 1).padStart(6, "0")}`} disabled />
-                  </div>
-                  <div className="field">
-                    <label>Issued batch</label>
-                    <select
-                      value={formState.jc_issue}
-                      onChange={(e) => setFormState({ ...formState, jc_issue: e.target.value })}
-                    >
-                      {getWarpingIssues().map((i) => (
-                        <option key={i.id} value={i.id}>
-                          {i.id} ({fmtG(i.qty_g)} g)
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-
-                  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "14px" }}>
+                <form onSubmit={(e) => { e.preventDefault(); handleJcSubmit("in_progress"); }}>
+                  <div className="modal-body">
+                    {/* Job card no. */}
                     <div className="field">
-                      <label>Saree design</label>
-                      <input
-                        type="text"
-                        value={formState.jc_design}
-                        placeholder="e.g. Peacock Border"
-                        onChange={(e) => setFormState({ ...formState, jc_design: e.target.value })}
-                      />
+                      <label>Job card no.</label>
+                      <input value={`JC-${String(jobCards.length + 1).padStart(6, "0")}`} disabled />
+                      <div className="hint">Auto-assigned, sequential — not editable.</div>
                     </div>
-                    <div className="field">
-                      <label>Preparation type</label>
-                      <select
-                        value={formState.jc_type}
-                        onChange={(e) => setFormState({ ...formState, jc_type: e.target.value })}
-                      >
-                        <option value="BORDER">Border warp</option>
-                        <option value="BODY">Body warp</option>
-                      </select>
-                    </div>
-                  </div>
 
-                  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "14px" }}>
+                    {/* Issued batch */}
                     <div className="field">
-                      <label>Loom no.</label>
+                      <label>Issued batch</label>
                       <select
-                        value={formState.jc_loom}
-                        onChange={(e) => setFormState({ ...formState, jc_loom: e.target.value })}
+                        value={formState.jc_issue}
+                        onChange={(e) => setFormState({ ...formState, jc_issue: e.target.value })}
                       >
-                        {productionSpaces.map((space) => (
-                          <option key={space.id} value={space.code}>
-                            {space.name}
+                        {getWarpingIssues().map((i) => (
+                          <option key={i.id} value={i.id}>
+                            {i.id} ({fmtG(i.qty_g)} g)
                           </option>
                         ))}
                       </select>
                     </div>
-                    <div className="field">
-                      <label>Operator</label>
-                      <input
-                        type="text"
-                        value={formState.jc_operator}
-                        placeholder="Operator name"
-                        onChange={(e) => setFormState({ ...formState, jc_operator: e.target.value })}
-                      />
-                    </div>
-                  </div>
 
-                  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: "14px" }}>
-                    <div className="field">
-                      <label>Ends</label>
-                      <input
-                        type="number"
-                        value={formState.jc_ends}
-                        onChange={(e) => setFormState({ ...formState, jc_ends: e.target.value })}
-                      />
-                    </div>
-                    <div className="field">
-                      <label>Length (m)</label>
-                      <input
-                        type="number"
-                        value={formState.jc_length}
-                        onChange={(e) => setFormState({ ...formState, jc_length: e.target.value })}
-                      />
-                    </div>
-                    <div className="field">
-                      <label>Width (in)</label>
-                      <input
-                        type="number"
-                        value={formState.jc_width}
-                        onChange={(e) => setFormState({ ...formState, jc_width: e.target.value })}
-                      />
-                    </div>
-                  </div>
+                    {/* Batch metrics banner */}
+                    {(() => {
+                      const activeIssue = issues.find((i) => i.id === formState.jc_issue) || getWarpingIssues()[0];
+                      if (!activeIssue) return null;
+                      const activeIssueJobCards = jobCards.filter((jc) => jc.issue_id === activeIssue.id);
+                      const issuedWeight = Number(activeIssue.qty_g || 0);
+                      const consumedWeight = activeIssueJobCards.reduce((sum, jc) => sum + Number(jc.consumed_g || 0), 0);
+                      const remainingWeight = Math.max(0, issuedWeight - consumedWeight);
+                      const jcCount = activeIssueJobCards.length;
 
-                  <div className="banner banner-neutral">
-                    <div>
-                      <div className="small" style={{ fontWeight: 600, color: "var(--accent-700)" }}>
-                        ESTIMATED CONSUMPTION
+                      return (
+                        <div className="banner banner-neutral" style={{ padding: "10px 14px", marginBottom: "16px", display: "flex", justifyContent: "space-between", flexWrap: "wrap", fontSize: "12.5px" }}>
+                          <span>Issued <strong>{fmtG(issuedWeight)} g</strong></span>
+                          <span>Consumed <strong>{fmtG(consumedWeight)} g</strong></span>
+                          <span>Remaining <strong>{fmtG(remainingWeight)} g</strong></span>
+                          <span>Job cards <strong>{jcCount}</strong></span>
+                        </div>
+                      );
+                    })()}
+
+                    <div style={{ fontWeight: 600, fontSize: "14px", marginTop: "16px", marginBottom: "8px", borderBottom: "1px solid var(--neutral-200)", paddingBottom: "4px" }}>SETUP</div>
+
+                    {/* Saree design & Preparation type */}
+                    <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "14px" }}>
+                      <div className="field">
+                        <label>Saree design</label>
+                        <input
+                          type="text"
+                          value={formState.jc_design}
+                          placeholder="e.g. Kanjivaram Peacock"
+                          onChange={(e) => setFormState({ ...formState, jc_design: e.target.value })}
+                        />
                       </div>
-                      <div style={{ fontSize: "18px", fontWeight: 700 }}>
+                      <div className="field">
+                        <label>Preparation type</label>
+                        <select
+                          value={formState.jc_type}
+                          onChange={(e) => setFormState({ ...formState, jc_type: e.target.value })}
+                        >
+                          <option value="BORDER">Border warp</option>
+                          <option value="BODY">Body warp</option>
+                        </select>
+                      </div>
+                    </div>
+
+                    {/* Loom no. & Operator */}
+                    <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "14px" }}>
+                      <div className="field">
+                        <label>Loom no.</label>
+                        <select
+                          value={formState.jc_loom}
+                          onChange={(e) => setFormState({ ...formState, jc_loom: e.target.value })}
+                        >
+                          {productionSpaces.map((space) => (
+                            <option key={space.id} value={space.code}>
+                              {space.name}
+                            </option>
+                          ))}
+                        </select>
+                        <div className="hint">From Masters — Production spaces.</div>
+                      </div>
+                      <div className="field">
+                        <label>Operator</label>
+                        <input
+                          type="text"
+                          value={formState.jc_operator}
+                          placeholder="Operator name"
+                          onChange={(e) => setFormState({ ...formState, jc_operator: e.target.value })}
+                        />
+                      </div>
+                    </div>
+
+                    <div style={{ fontWeight: 600, fontSize: "14px", marginTop: "16px", marginBottom: "8px", borderBottom: "1px solid var(--neutral-200)", paddingBottom: "4px" }}>WARP PARAMETERS</div>
+
+                    {/* Warp Parameters: Ends, Length, Width */}
+                    <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: "14px" }}>
+                      <div className="field">
+                        <label>Number of ends</label>
+                        <input
+                          type="number"
+                          value={formState.jc_ends}
+                          onChange={(e) => setFormState({ ...formState, jc_ends: e.target.value })}
+                        />
+                      </div>
+                      <div className="field">
+                        <label>Length (meters)</label>
+                        <input
+                          type="number"
+                          value={formState.jc_length}
+                          onChange={(e) => setFormState({ ...formState, jc_length: e.target.value })}
+                        />
+                      </div>
+                      <div className="field">
+                        <label>Warp width (inches)</label>
+                        <input
+                          type="number"
+                          value={formState.jc_width}
+                          onChange={(e) => setFormState({ ...formState, jc_width: e.target.value })}
+                        />
+                      </div>
+                    </div>
+
+                    {/* Estimated Consumption card */}
+                    <div style={{ background: "var(--neutral-100)", borderRadius: "8px", padding: "16px", marginTop: "16px" }}>
+                      <div className="small" style={{ fontWeight: 600, color: "var(--neutral-700)" }}>ESTIMATED CONSUMPTION ((ends × 2) × length ÷ 68)</div>
+                      <div style={{ fontSize: "20px", fontWeight: 700, margin: "6px 0" }}>
                         {fmtG(estimatedConsumptionG(Number(formState.jc_ends), Number(formState.jc_length)))} g
                       </div>
+                      <div className="small" style={{ color: "var(--neutral-50)" }}>This is a guide only. Actual figure comes from the warping log.</div>
                     </div>
                   </div>
 
-                  <div className="modal-actions" style={{ marginTop: "18px" }}>
+                  <div className="modal-actions">
                     <button type="button" className="btn" onClick={() => setFormState({})}>
                       Cancel
                     </button>
-                    <button type="submit" className="btn btn-primary">
-                      Submit job card
+                    <button type="button" className="btn" onClick={() => handleJcSubmit("pending")} disabled={submitting}>
+                      Save as draft
+                    </button>
+                    <button type="submit" className="btn btn-primary" disabled={submitting}>
+                      {submitting ? "Submitting..." : "Submit job card"}
                     </button>
                   </div>
                 </form>
@@ -1185,121 +1228,123 @@ export default function WarpingPage() {
             <div className="modal-overlay" onClick={() => setFormState({})}>
               <div className="modal" style={{ maxWidth: "680px" }} onClick={(e) => e.stopPropagation()}>
                 <h3>New warping log</h3>
-                <form onSubmit={(e) => { e.preventDefault(); handleWlSubmit(); }} style={{ marginTop: "14px" }}>
-                  <div className="field">
-                    <label>Job card</label>
-                    <select
-                      value={formState.wl_jobcard}
-                      onChange={(e) => setFormState({ ...formState, wl_jobcard: e.target.value })}
-                    >
-                      {jobCards
-                        .filter((jc) => jc.status === "in_progress")
-                        .map((jc) => (
-                          <option key={jc.id} value={jc.id}>
-                            {jc.id} — {jc.saree_design} ({jc.operator})
-                          </option>
-                        ))}
-                    </select>
-                  </div>
+                <form onSubmit={(e) => { e.preventDefault(); handleWlSubmit(); }}>
+                  <div className="modal-body">
+                    <div className="field">
+                      <label>Job card</label>
+                      <select
+                        value={formState.wl_jobcard}
+                        onChange={(e) => setFormState({ ...formState, wl_jobcard: e.target.value })}
+                      >
+                        {jobCards
+                          .filter((jc) => jc.status === "in_progress")
+                          .map((jc) => (
+                            <option key={jc.id} value={jc.id}>
+                              {jc.id} — {jc.saree_design} ({jc.operator})
+                            </option>
+                          ))}
+                      </select>
+                    </div>
 
-                  <div className={`field ${attempted && formErrors.wl_operator ? "has-error" : ""}`}>
-                    <label>Operator name <span className="req">*</span></label>
-                    <input
-                      type="text"
-                      value={formState.wl_operator}
-                      onChange={(e) => setFormState({ ...formState, wl_operator: e.target.value })}
-                    />
-                    {attempted && formErrors.wl_operator && (
-                      <div className="field-error-text">{formErrors.wl_operator}</div>
+                    <div className={`field ${attempted && formErrors.wl_operator ? "has-error" : ""}`}>
+                      <label>Operator name <span className="req">*</span></label>
+                      <input
+                        type="text"
+                        value={formState.wl_operator}
+                        onChange={(e) => setFormState({ ...formState, wl_operator: e.target.value })}
+                      />
+                      {attempted && formErrors.wl_operator && (
+                        <div className="field-error-text">{formErrors.wl_operator}</div>
+                      )}
+                    </div>
+
+                    <hr className="divider" />
+                    <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "16px" }}>
+                      <div style={{ background: "var(--accent-100)", borderRadius: "8px", padding: "12px" }}>
+                        <div className="small" style={{ fontWeight: 600, color: "var(--accent-700)", marginBottom: "8px" }}>
+                          BEAM / SIDE A
+                        </div>
+                        <div className="field">
+                          <label>Newspaper A (g)</label>
+                          <input
+                            type="number"
+                            value={formState.wl_ns_a}
+                            onChange={(e) => setFormState({ ...formState, wl_ns_a: e.target.value })}
+                          />
+                        </div>
+                        <div className="field">
+                          <label>Fruity paper A (g)</label>
+                          <input
+                            type="number"
+                            value={formState.wl_fp_a}
+                            onChange={(e) => setFormState({ ...formState, wl_fp_a: e.target.value })}
+                          />
+                        </div>
+                        <div className="field">
+                          <label>Empty beam A (g)</label>
+                          <input
+                            type="number"
+                            value={formState.wl_eb_a}
+                            onChange={(e) => setFormState({ ...formState, wl_eb_a: e.target.value })}
+                          />
+                        </div>
+                        <div className={`field ${attempted && formErrors.wl_gross_a ? "has-error" : ""}`}>
+                          <label>Gross weight A (g) <span className="req">*</span></label>
+                          <input
+                            type="number"
+                            value={formState.wl_gross_a}
+                            onChange={(e) => setFormState({ ...formState, wl_gross_a: e.target.value })}
+                          />
+                        </div>
+                      </div>
+
+                      <div style={{ background: "var(--accent-100)", borderRadius: "8px", padding: "12px" }}>
+                        <div className="small" style={{ fontWeight: 600, color: "var(--accent-700)", marginBottom: "8px" }}>
+                          BEAM / SIDE B
+                        </div>
+                        <div className="field">
+                          <label>Newspaper B (g)</label>
+                          <input
+                            type="number"
+                            value={formState.wl_ns_b}
+                            onChange={(e) => setFormState({ ...formState, wl_ns_b: e.target.value })}
+                          />
+                        </div>
+                        <div className="field">
+                          <label>Fruity paper B (g)</label>
+                          <input
+                            type="number"
+                            value={formState.wl_fp_b}
+                            onChange={(e) => setFormState({ ...formState, wl_fp_b: e.target.value })}
+                          />
+                        </div>
+                        <div className="field">
+                          <label>Empty beam B (g)</label>
+                          <input
+                            type="number"
+                            value={formState.wl_eb_b}
+                            onChange={(e) => setFormState({ ...formState, wl_eb_b: e.target.value })}
+                          />
+                        </div>
+                        <div className={`field ${attempted && formErrors.wl_gross_b ? "has-error" : ""}`}>
+                          <label>Gross weight B (g) <span className="req">*</span></label>
+                          <input
+                            type="number"
+                            value={formState.wl_gross_b}
+                            onChange={(e) => setFormState({ ...formState, wl_gross_b: e.target.value })}
+                          />
+                        </div>
+                      </div>
+                    </div>
+
+                    {attempted && (formErrors.wl_gross_a || formErrors.wl_gross_b) && (
+                      <div className="field-error-text" style={{ marginTop: "14px" }}>
+                        {formErrors.wl_gross_a || formErrors.wl_gross_b}
+                      </div>
                     )}
                   </div>
 
-                  <hr className="divider" />
-                  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "16px" }}>
-                    <div style={{ background: "var(--accent-100)", borderRadius: "8px", padding: "12px" }}>
-                      <div className="small" style={{ fontWeight: 600, color: "var(--accent-700)", marginBottom: "8px" }}>
-                        BEAM / SIDE A
-                      </div>
-                      <div className="field">
-                        <label>Newspaper A (g)</label>
-                        <input
-                          type="number"
-                          value={formState.wl_ns_a}
-                          onChange={(e) => setFormState({ ...formState, wl_ns_a: e.target.value })}
-                        />
-                      </div>
-                      <div className="field">
-                        <label>Fruity paper A (g)</label>
-                        <input
-                          type="number"
-                          value={formState.wl_fp_a}
-                          onChange={(e) => setFormState({ ...formState, wl_fp_a: e.target.value })}
-                        />
-                      </div>
-                      <div className="field">
-                        <label>Empty beam A (g)</label>
-                        <input
-                          type="number"
-                          value={formState.wl_eb_a}
-                          onChange={(e) => setFormState({ ...formState, wl_eb_a: e.target.value })}
-                        />
-                      </div>
-                      <div className={`field ${attempted && formErrors.wl_gross_a ? "has-error" : ""}`}>
-                        <label>Gross weight A (g) <span className="req">*</span></label>
-                        <input
-                          type="number"
-                          value={formState.wl_gross_a}
-                          onChange={(e) => setFormState({ ...formState, wl_gross_a: e.target.value })}
-                        />
-                      </div>
-                    </div>
-
-                    <div style={{ background: "var(--accent-100)", borderRadius: "8px", padding: "12px" }}>
-                      <div className="small" style={{ fontWeight: 600, color: "var(--accent-700)", marginBottom: "8px" }}>
-                        BEAM / SIDE B
-                      </div>
-                      <div className="field">
-                        <label>Newspaper B (g)</label>
-                        <input
-                          type="number"
-                          value={formState.wl_ns_b}
-                          onChange={(e) => setFormState({ ...formState, wl_ns_b: e.target.value })}
-                        />
-                      </div>
-                      <div className="field">
-                        <label>Fruity paper B (g)</label>
-                        <input
-                          type="number"
-                          value={formState.wl_fp_b}
-                          onChange={(e) => setFormState({ ...formState, wl_fp_b: e.target.value })}
-                        />
-                      </div>
-                      <div className="field">
-                        <label>Empty beam B (g)</label>
-                        <input
-                          type="number"
-                          value={formState.wl_eb_b}
-                          onChange={(e) => setFormState({ ...formState, wl_eb_b: e.target.value })}
-                        />
-                      </div>
-                      <div className={`field ${attempted && formErrors.wl_gross_b ? "has-error" : ""}`}>
-                        <label>Gross weight B (g) <span className="req">*</span></label>
-                        <input
-                          type="number"
-                          value={formState.wl_gross_b}
-                          onChange={(e) => setFormState({ ...formState, wl_gross_b: e.target.value })}
-                        />
-                      </div>
-                    </div>
-                  </div>
-
-                  {attempted && (formErrors.wl_gross_a || formErrors.wl_gross_b) && (
-                    <div className="field-error-text" style={{ marginTop: "14px" }}>
-                      {formErrors.wl_gross_a || formErrors.wl_gross_b}
-                    </div>
-                  )}
-
-                  <div className="modal-actions" style={{ marginTop: "18px" }}>
+                  <div className="modal-actions">
                     <button type="button" className="btn" onClick={() => setFormState({})}>
                       Cancel
                     </button>

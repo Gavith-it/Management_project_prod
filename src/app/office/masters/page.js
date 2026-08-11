@@ -6,6 +6,7 @@ import { getSessionUser } from "@/lib/auth";
 import { canEdit } from "@/lib/permissions";
 import Icon from "@/components/Icons";
 import { fmtG } from "@/lib/math";
+import ConfirmModal from "@/components/ConfirmModal";
 
 const CATEGORIES = [
   { label: "Legal entities", entity: "legalEntities" },
@@ -32,6 +33,7 @@ export default function MastersPage() {
   const [attempted, setAttempted] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [notification, setNotification] = useState(null);
+  const [deleteConfirm, setDeleteConfirm] = useState({ isOpen: false, entity: null, record: null });
 
   // Load all master tables
   const loadData = async () => {
@@ -402,8 +404,7 @@ export default function MastersPage() {
             options: [
               { value: "admin", label: "Admin" },
               { value: "inv_sup", label: "Inventory Supervisor" },
-              { value: "operator", label: "Operator" },
-              { value: "viewer", label: "Viewer" }
+              { value: "operator", label: "Operator" }
             ]
           }
         ],
@@ -414,11 +415,11 @@ export default function MastersPage() {
           return errors;
         },
         toRecord: (form) => {
-          const roleMap = { admin: "Admin", inv_sup: "Inventory Supervisor", operator: "Operator", viewer: "Viewer" };
+          const roleMap = { admin: "Admin", inv_sup: "Inventory Supervisor", operator: "Operator" };
           return {
             name: form.name.trim(),
             role: form.role,
-            roleLabel: roleMap[form.role] || "Viewer"
+            roleLabel: roleMap[form.role] || "Operator"
           };
         }
       }
@@ -491,6 +492,37 @@ export default function MastersPage() {
     } catch (err) {
       console.error("Save error", err);
       setNotification({ tone: "danger", text: "Failed to save record." });
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const handleDeleteClick = (entityKey, record) => {
+    setDeleteConfirm({ isOpen: true, entity: entityKey, record });
+  };
+
+  const handleConfirmDelete = async () => {
+    const { entity, record } = deleteConfirm;
+    const config = getEntityConfig(entity);
+    const idVal = record[config.idKey];
+
+    setSubmitting(true);
+    try {
+      await db.delete(entity, idVal, config.idKey);
+
+      // Create Audit Log Entry
+      const actor = `${user.name} · ${user.roleLabel}`;
+      const action = `Deleted ${config.label.toLowerCase()}`;
+      const ref = String(idVal);
+      await db.save("auditLog", { ts: new Date().toLocaleTimeString(), actor, action, ref });
+
+      setNotification({ tone: "success", text: `${config.label} deleted successfully.` });
+      setDeleteConfirm({ isOpen: false, entity: null, record: null });
+      loadData();
+    } catch (err) {
+      console.error("Delete error", err);
+      setNotification({ tone: "danger", text: "Failed to delete record. It may be referenced in active transactions." });
+      setDeleteConfirm({ isOpen: false, entity: null, record: null });
     } finally {
       setSubmitting(false);
     }
@@ -589,13 +621,20 @@ export default function MastersPage() {
                           );
                         })}
                         {canModifyThisTable && (
-                          <td>
+                          <td style={{ display: "flex", gap: "6px" }}>
                             <button
                               className="btn"
                               style={{ padding: "5px 10px" }}
                               onClick={() => handleEditClick(cat.entity, row)}
                             >
                               Edit
+                            </button>
+                            <button
+                              className="btn btn-danger"
+                              style={{ padding: "5px 10px" }}
+                              onClick={() => handleDeleteClick(cat.entity, row)}
+                            >
+                              Delete
                             </button>
                           </td>
                         )}
@@ -625,62 +664,64 @@ export default function MastersPage() {
                 : getEntityConfig(activeEntity).addLabel}
             </h3>
             
-            <form onSubmit={handleSave} style={{ marginTop: "14px" }}>
-              {getEntityConfig(activeEntity).fields.map((f) => {
-                const val = formState[f.key] !== undefined ? formState[f.key] : "";
-                const isError = attempted && formErrors[f.key];
+            <form onSubmit={handleSave}>
+              <div className="modal-body" style={{ marginTop: "14px" }}>
+                {getEntityConfig(activeEntity).fields.map((f) => {
+                  const val = formState[f.key] !== undefined ? formState[f.key] : "";
+                  const isError = attempted && formErrors[f.key];
 
-                let inputNode;
-                if (f.type === "select") {
-                  const opts = typeof f.options === "function" ? f.options() : f.options;
-                  inputNode = (
-                    <select
-                      value={val}
-                      onChange={(e) => setFormState({ ...formState, [f.key]: e.target.value })}
-                    >
-                      {opts.map((o, oIdx) => {
-                        const ov = typeof o === "object" ? o.value : o;
-                        const ol = typeof o === "object" ? o.label : o;
-                        return (
-                          <option key={oIdx} value={ov}>
-                            {ol}
-                          </option>
-                        );
-                      })}
-                    </select>
-                  );
-                } else {
-                  inputNode = (
-                    <input
-                      type={f.type || "text"}
-                      step={f.step}
-                      placeholder={f.placeholder}
-                      value={val}
-                      onChange={(e) => setFormState({ ...formState, [f.key]: e.target.value })}
-                    />
-                  );
-                }
+                  let inputNode;
+                  if (f.type === "select") {
+                    const opts = typeof f.options === "function" ? f.options() : f.options;
+                    inputNode = (
+                      <select
+                        value={val}
+                        onChange={(e) => setFormState({ ...formState, [f.key]: e.target.value })}
+                      >
+                        {opts.map((o, oIdx) => {
+                          const ov = typeof o === "object" ? o.value : o;
+                          const ol = typeof o === "object" ? o.label : o;
+                          return (
+                            <option key={oIdx} value={ov}>
+                              {ol}
+                            </option>
+                          );
+                        })}
+                      </select>
+                    );
+                  } else {
+                    inputNode = (
+                      <input
+                        type={f.type || "text"}
+                        step={f.step}
+                        placeholder={f.placeholder}
+                        value={val}
+                        onChange={(e) => setFormState({ ...formState, [f.key]: e.target.value })}
+                      />
+                    );
+                  }
 
-                return (
-                  <div key={f.key} className={`field ${isError ? "has-error" : ""}`}>
-                    <label>
-                      {f.label}
-                      {f.required && <span className="req"> *</span>}
-                    </label>
-                    {inputNode}
-                    {isError && <div className="field-error-text">{formErrors[f.key]}</div>}
+                  return (
+                    <div key={f.key} className={`field ${isError ? "has-error" : ""}`}>
+                      <label>
+                        {f.label}
+                        {f.required && <span className="req"> *</span>}
+                      </label>
+                      {inputNode}
+                      {isError && <div className="field-error-text">{formErrors[f.key]}</div>}
+                    </div>
+                  );
+                })}
+
+                {attempted && Object.keys(formErrors).length > 0 && (
+                  <div className="banner banner-danger" style={{ marginTop: "14px" }}>
+                    <Icon name="alert" size={18} />
+                    <div>Fix the highlighted fields before saving.</div>
                   </div>
-                );
-              })}
+                )}
+              </div>
 
-              {attempted && Object.keys(formErrors).length > 0 && (
-                <div className="banner banner-danger" style={{ marginTop: "14px" }}>
-                  <Icon name="alert" size={18} />
-                  <div>Fix the highlighted fields before saving.</div>
-                </div>
-              )}
-
-              <div className="modal-actions" style={{ marginTop: "22px" }}>
+              <div className="modal-actions">
                 <button type="button" className="btn" onClick={() => setView("list")} disabled={submitting}>
                   Cancel
                 </button>
@@ -692,6 +733,17 @@ export default function MastersPage() {
           </div>
         </div>
       )}
+
+      <ConfirmModal
+        isOpen={deleteConfirm.isOpen}
+        title={`Delete ${deleteConfirm.entity ? getEntityConfig(deleteConfirm.entity).label.toLowerCase() : ""}`}
+        body={`Are you sure you want to delete this ${deleteConfirm.entity ? getEntityConfig(deleteConfirm.entity).label.toLowerCase() : ""}? This action cannot be undone.`}
+        confirmLabel="Delete"
+        isDanger={true}
+        submitting={submitting}
+        onConfirm={handleConfirmDelete}
+        onCancel={() => setDeleteConfirm({ isOpen: false, entity: null, record: null })}
+      />
     </>
   );
 }

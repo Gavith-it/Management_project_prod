@@ -957,28 +957,31 @@ td.num, th.num {
   width: 100%;
   padding: 22px;
   box-shadow: var(--shadow-lg);
-  margin: auto 0; /* Vertically centers when there's height, scrolls from top when overflowed */
+  margin: auto 20px;
   animation: modalPopIn .18s var(--ease);
+  display: flex;
+  flex-direction: column;
+  max-height: calc(100vh - 80px);
 }
-/* Compact overrides for forms inside modal frames */
-.modal .field {
-  margin-bottom: 8px;
+.modal form {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  overflow: hidden;
 }
-.modal .field label {
-  margin-bottom: 3px;
-  font-size: 12px;
-}
-.modal input, .modal select, .modal textarea {
-  padding: 6px 10px;
-  font-size: 13px;
+.modal-body {
+  overflow-y: auto;
+  padding-right: 6px;
+  margin-bottom: 12px;
+  flex: 1;
 }
 .modal .divider {
-  margin: 10px 0;
+  margin: 14px 0;
 }
 .modal .banner {
-  padding: 8px 12px;
-  margin-bottom: 8px;
-  font-size: 12px;
+  padding: 10px 14px;
+  margin-bottom: 12px;
+  font-size: 13px;
 }
 .modal h3 {
   font-size: 16px;

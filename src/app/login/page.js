@@ -4,11 +4,12 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { setSessionUser } from "@/lib/auth";
 
+import { useEffect } from "react";
+
 const USERS = [
-  { id: 1, name: "Asha Rao", role: "admin", roleLabel: "Admin" },
-  { id: 2, name: "Manoj Iyer", role: "inv_sup", roleLabel: "Inventory Supervisor" },
-  { id: 3, name: "Ravi Kumar", role: "operator", roleLabel: "Operator" },
-  { id: 4, name: "Divya Shah", role: "viewer", roleLabel: "Viewer" },
+  { id: 1, name: "Sharun", role: "admin", roleLabel: "Admin" },
+  { id: 2, name: "Deepika", role: "inv_sup", roleLabel: "Inventory Supervisor" },
+  { id: 3, name: "Narend", role: "operator", roleLabel: "Operator" },
 ];
 
 export default function LoginPage() {
@@ -17,17 +18,34 @@ export default function LoginPage() {
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
+  const [rememberMe, setRememberMe] = useState(false);
+  const [forgotMsg, setForgotMsg] = useState("");
+
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      const savedUserId = localStorage.getItem("remembered_user_id");
+      if (savedUserId) {
+        const matched = USERS.find((u) => String(u.id) === String(savedUserId));
+        if (matched) {
+          setSelectedUser(matched);
+          setRememberMe(true);
+        }
+      }
+    }
+  }, []);
 
   const handleSelectUser = (u) => {
     setSelectedUser(u);
     setError("");
     setPassword("");
+    setForgotMsg("");
   };
 
   const handleBack = () => {
     setSelectedUser(null);
     setError("");
     setPassword("");
+    setForgotMsg("");
   };
 
   const handleLogin = (e) => {
@@ -39,9 +57,15 @@ export default function LoginPage() {
 
     setLoading(true);
 
-    // Mock verification (accepts 'password' or any characters for demo purposes)
     setTimeout(() => {
       setLoading(false);
+      if (typeof window !== "undefined") {
+        if (rememberMe) {
+          localStorage.setItem("remembered_user_id", selectedUser.id);
+        } else {
+          localStorage.removeItem("remembered_user_id");
+        }
+      }
       setSessionUser(selectedUser);
       router.push(selectedUser.role === "operator" ? "/shopfloor" : "/office");
     }, 600);
@@ -96,6 +120,13 @@ export default function LoginPage() {
               <div style={{ display: "flex", alignItems: "center", gap: "10px", marginBottom: "16px" }}>
                 <span className="badge badge-success">{selectedUser.roleLabel}</span>
               </div>
+
+              {forgotMsg && (
+                <div className="banner banner-danger" style={{ marginBottom: "16px", padding: "10px", fontSize: "13px" }}>
+                  {forgotMsg}
+                </div>
+              )}
+
               <div className="field">
                 <label>Password</label>
                 <input
@@ -107,6 +138,26 @@ export default function LoginPage() {
                 />
                 <div className="hint">For testing, you can type any password.</div>
               </div>
+
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "16px", marginTop: "8px" }}>
+                <label style={{ display: "flex", alignItems: "center", gap: "6px", fontSize: "12px", cursor: "pointer", userSelect: "none", color: "var(--neutral-700)" }}>
+                  <input
+                    type="checkbox"
+                    checked={rememberMe}
+                    onChange={(e) => setRememberMe(e.target.checked)}
+                    style={{ cursor: "pointer" }}
+                  />
+                  Remember me
+                </label>
+                <button
+                  type="button"
+                  onClick={() => setForgotMsg("Please contact Admin (Sharun) to reset your password.")}
+                  style={{ background: "none", border: "none", color: "var(--accent-700)", fontSize: "12px", cursor: "pointer", textDecoration: "underline", padding: 0 }}
+                >
+                  Forgot password?
+                </button>
+              </div>
+
               {error && <div className="field-error-text" style={{ marginBottom: "14px" }}>{error}</div>}
               <button
                 type="submit"
