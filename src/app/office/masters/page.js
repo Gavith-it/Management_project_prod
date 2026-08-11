@@ -664,62 +664,64 @@ export default function MastersPage() {
                 : getEntityConfig(activeEntity).addLabel}
             </h3>
             
-            <form onSubmit={handleSave} style={{ marginTop: "14px" }}>
-              {getEntityConfig(activeEntity).fields.map((f) => {
-                const val = formState[f.key] !== undefined ? formState[f.key] : "";
-                const isError = attempted && formErrors[f.key];
+            <form onSubmit={handleSave}>
+              <div className="modal-body" style={{ marginTop: "14px" }}>
+                {getEntityConfig(activeEntity).fields.map((f) => {
+                  const val = formState[f.key] !== undefined ? formState[f.key] : "";
+                  const isError = attempted && formErrors[f.key];
 
-                let inputNode;
-                if (f.type === "select") {
-                  const opts = typeof f.options === "function" ? f.options() : f.options;
-                  inputNode = (
-                    <select
-                      value={val}
-                      onChange={(e) => setFormState({ ...formState, [f.key]: e.target.value })}
-                    >
-                      {opts.map((o, oIdx) => {
-                        const ov = typeof o === "object" ? o.value : o;
-                        const ol = typeof o === "object" ? o.label : o;
-                        return (
-                          <option key={oIdx} value={ov}>
-                            {ol}
-                          </option>
-                        );
-                      })}
-                    </select>
-                  );
-                } else {
-                  inputNode = (
-                    <input
-                      type={f.type || "text"}
-                      step={f.step}
-                      placeholder={f.placeholder}
-                      value={val}
-                      onChange={(e) => setFormState({ ...formState, [f.key]: e.target.value })}
-                    />
-                  );
-                }
+                  let inputNode;
+                  if (f.type === "select") {
+                    const opts = typeof f.options === "function" ? f.options() : f.options;
+                    inputNode = (
+                      <select
+                        value={val}
+                        onChange={(e) => setFormState({ ...formState, [f.key]: e.target.value })}
+                      >
+                        {opts.map((o, oIdx) => {
+                          const ov = typeof o === "object" ? o.value : o;
+                          const ol = typeof o === "object" ? o.label : o;
+                          return (
+                            <option key={oIdx} value={ov}>
+                              {ol}
+                            </option>
+                          );
+                        })}
+                      </select>
+                    );
+                  } else {
+                    inputNode = (
+                      <input
+                        type={f.type || "text"}
+                        step={f.step}
+                        placeholder={f.placeholder}
+                        value={val}
+                        onChange={(e) => setFormState({ ...formState, [f.key]: e.target.value })}
+                      />
+                    );
+                  }
 
-                return (
-                  <div key={f.key} className={`field ${isError ? "has-error" : ""}`}>
-                    <label>
-                      {f.label}
-                      {f.required && <span className="req"> *</span>}
-                    </label>
-                    {inputNode}
-                    {isError && <div className="field-error-text">{formErrors[f.key]}</div>}
+                  return (
+                    <div key={f.key} className={`field ${isError ? "has-error" : ""}`}>
+                      <label>
+                        {f.label}
+                        {f.required && <span className="req"> *</span>}
+                      </label>
+                      {inputNode}
+                      {isError && <div className="field-error-text">{formErrors[f.key]}</div>}
+                    </div>
+                  );
+                })}
+
+                {attempted && Object.keys(formErrors).length > 0 && (
+                  <div className="banner banner-danger" style={{ marginTop: "14px" }}>
+                    <Icon name="alert" size={18} />
+                    <div>Fix the highlighted fields before saving.</div>
                   </div>
-                );
-              })}
+                )}
+              </div>
 
-              {attempted && Object.keys(formErrors).length > 0 && (
-                <div className="banner banner-danger" style={{ marginTop: "14px" }}>
-                  <Icon name="alert" size={18} />
-                  <div>Fix the highlighted fields before saving.</div>
-                </div>
-              )}
-
-              <div className="modal-actions" style={{ marginTop: "22px" }}>
+              <div className="modal-actions">
                 <button type="button" className="btn" onClick={() => setView("list")} disabled={submitting}>
                   Cancel
                 </button>

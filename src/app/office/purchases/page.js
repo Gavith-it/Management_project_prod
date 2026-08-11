@@ -170,8 +170,8 @@ export default function PurchasesPage() {
     return errors;
   };
 
-  const handleSaveDraft = async (e) => {
-    e.preventDefault();
+  const handleSaveForm = async (e, isSubmit = false) => {
+    if (e) e.preventDefault();
     const errors = validateForm(formState);
     setFormErrors(errors);
     setAttempted(true);
@@ -195,7 +195,7 @@ export default function PurchasesPage() {
         supplier: calc.supplierName,
         invoice_no: formState.invoice_no,
         invoice_date: formState.invoice_date,
-        status: "draft",
+        status: isSubmit ? "posted" : "draft",
         uom: calc.uom,
         qty: calc.qty,
         rate_per_unit: calc.ratePerUnit,
@@ -230,12 +230,61 @@ export default function PurchasesPage() {
       };
 
       await db.save("purchases", newPurchase, "id", pId);
-      setNotification({ tone: "success", text: `Draft saved successfully as ${pId}.` });
+
+      if (isSubmit) {
+        const line = newPurchase.lines[0];
+        const actor = `${user.name} · ${user.roleLabel}`;
+
+        // Seed Batch
+        await db.save("sourceBatches", {
+          id: newPurchase.batch,
+          purchase: newPurchase.id,
+          item: line.item,
+          qty_g: newPurchase.net_g,
+          created: newPurchase.invoice_date
+        }, "id", newPurchase.batch);
+
+        // Seed Inventory Lot
+        const newLotId = `LOT-${String(db.getTotalAvailableGrams() > 0 ? purchases.length + 7 : purchases.length + 1).padStart(8, "0")}`;
+        await db.save("lots", {
+          id: newLotId,
+          item: line.item,
+          item_id: line.item_code,
+          location: "STORE-01",
+          parent: null,
+          source: newPurchase.id,
+          batch: newPurchase.batch,
+          qty_pieces: newPurchase.uom === "Grams" ? null : line.qty,
+          piece_uom: newPurchase.uom === "Grams" ? null : newPurchase.uom,
+          is_mixed_batch: false,
+          carrier_code: null,
+          landed_cost_per_gram: newPurchase.cost_per_gram,
+          status: "available"
+        }, "id", newLotId);
+
+        // Seed Stock Ledger
+        const sleId = `SLE-${String((await db.get("stockLedger")).length + 1).padStart(6, "0")}`;
+        await db.save("stockLedger", {
+          id: sleId,
+          lot: newLotId,
+          item: line.item,
+          qty_g: newPurchase.net_g,
+          type: "purchase_receipt",
+          ref: newPurchase.id,
+          location: "STORE-01"
+        }, "id", sleId);
+
+        await db.save("auditLog", { ts: new Date().toLocaleTimeString(), actor, action: "Posted purchase", ref: newPurchase.id });
+        setNotification({ tone: "success", text: `${pId} posted successfully. Receipts created.` });
+      } else {
+        setNotification({ tone: "success", text: `Draft saved successfully as ${pId}.` });
+      }
+
       setView("list");
       loadData();
     } catch (err) {
-      console.error("Save draft error", err);
-      setNotification({ tone: "danger", text: "Failed to save draft." });
+      console.error("Save/Submit form error", err);
+      setNotification({ tone: "danger", text: isSubmit ? "Failed to post purchase." : "Failed to save draft." });
     } finally {
       setSubmitting(false);
     }
@@ -588,87 +637,194 @@ export default function PurchasesPage() {
       {/* Render purchase form in a modal overlay */}
       {view === "form" && (
         <div className="modal-overlay" onClick={() => setView(activePurchaseId ? "detail" : "list")}>
-          <div className="modal" style={{ maxWidth: "780px" }} onClick={(e) => e.stopPropagation()}>
+          <div className="modal" style={{ maxWidth: "600px" }} onClick={(e) => e.stopPropagation()}>
             <h3 style={{ marginBottom: "12px" }}>{activePurchaseId ? `Edit purchase — ${activePurchaseId}` : "New purchase"}</h3>
             
-            <form onSubmit={handleSaveDraft}>
-              {/* Row 1: Supplier, Batch ID, Invoice no., Invoice date */}
-              <div style={{ display: "grid", gridTemplateColumns: "1.8fr 1fr 1fr 1fr", gap: "10px", marginBottom: "8px" }}>
-                <div className="field">
-                  <label>Supplier</label>
-                  <select
-                    value={formState.supplier}
-                    onChange={(e) => setFormState({ ...formState, supplier: e.target.value })}
-                  >
-                    {suppliers.map((s, idx) => (
-                      <option key={idx} value={s.name}>
-                        {s.name}
-                      </option>
-                    ))}
-                  </select>
+            <form onSubmit={(e) => handleSaveForm(e, true)}>
+              <div className="modal-body">
+                {/* Row 1: Supplier & Batch ID (2 columns) */}
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "12px" }}>
+                  <div className="field">
+                    <label>Supplier</label>
+                    <select
+                      value={formState.supplier}
+                      onChange={(e) => setFormState({ ...formState, supplier: e.target.value })}
+                    >
+                      {suppliers.map((s, idx) => (
+                        <option key={idx} value={s.name}>
+                          {s.name}
+                        </option>
+                      ))}
+                    </select>
+                    <div className="hint">GST type is picked automatically from the supplier's state and GSTIN — not a field you set.</div>
+                  </div>
+                  <div className="field">
+                    <label>Batch ID</label>
+                    <input
+                      value={
+                        activePurchaseId
+                          ? purchases.find((p) => p.id === activePurchaseId).batch
+                          : `BATCH-2627-${String(purchases.length + 1).padStart(5, "0")}`
+                      }
+                      disabled
+                    />
+                    <div className="hint">Auto-assigned and sequential — not editable.</div>
+                  </div>
                 </div>
-                <div className="field">
-                  <label>Batch ID</label>
-                  <input
-                    value={
-                      activePurchaseId
-                        ? purchases.find((p) => p.id === activePurchaseId).batch
-                        : `BATCH-2627-${String(purchases.length + 1).padStart(5, "0")}`
-                    }
-                    disabled
-                  />
-                </div>
-                <div className={`field ${attempted && formErrors.invoice_no ? "has-error" : ""}`}>
-                  <label>Invoice no. <span className="req">*</span></label>
-                  <input
-                    type="text"
-                    value={formState.invoice_no}
-                    onChange={(e) => setFormState({ ...formState, invoice_no: e.target.value })}
-                    placeholder="e.g. INV-2202"
-                  />
-                  {attempted && formErrors.invoice_no && (
-                    <div className="field-error-text" style={{ fontSize: "10px", marginTop: "2px" }}>{formErrors.invoice_no}</div>
-                  )}
-                </div>
-                <div className={`field ${attempted && formErrors.invoice_date ? "has-error" : ""}`}>
-                  <label>Invoice date <span className="req">*</span></label>
-                  <input
-                    type="date"
-                    value={formState.invoice_date}
-                    max={todayISO()}
-                    onChange={(e) => setFormState({ ...formState, invoice_date: e.target.value })}
-                  />
-                  {attempted && formErrors.invoice_date && (
-                    <div className="field-error-text" style={{ fontSize: "10px", marginTop: "2px" }}>{formErrors.invoice_date}</div>
-                  )}
-                </div>
-              </div>
 
-              {/* Row 2: Item, UOM, Freight charges */}
-              <div style={{ display: "grid", gridTemplateColumns: "1.8fr 1fr 1.2fr", gap: "10px", marginBottom: "8px" }}>
-                <div className="field">
-                  <label>Item</label>
-                  <select
-                    value={formState.item}
-                    onChange={(e) => setFormState({ ...formState, item: e.target.value })}
-                  >
-                    {items.map((i, idx) => (
-                      <option key={idx} value={i.name}>
-                        {i.name}
-                      </option>
-                    ))}
-                  </select>
+                {/* Row 2: Invoice no. & Invoice date (2 columns) */}
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "12px" }}>
+                  <div className={`field ${attempted && formErrors.invoice_no ? "has-error" : ""}`}>
+                    <label>Invoice no. <span className="req">*</span></label>
+                    <input
+                      type="text"
+                      value={formState.invoice_no}
+                      onChange={(e) => setFormState({ ...formState, invoice_no: e.target.value })}
+                      placeholder="e.g. INV-2202"
+                    />
+                    {attempted && formErrors.invoice_no && (
+                      <div className="field-error-text" style={{ fontSize: "10px", marginTop: "2px" }}>{formErrors.invoice_no}</div>
+                    )}
+                  </div>
+                  <div className={`field ${attempted && formErrors.invoice_date ? "has-error" : ""}`}>
+                    <label>Invoice date <span className="req">*</span></label>
+                    <input
+                      type="date"
+                      value={formState.invoice_date}
+                      max={todayISO()}
+                      onChange={(e) => setFormState({ ...formState, invoice_date: e.target.value })}
+                    />
+                    {attempted && formErrors.invoice_date && (
+                      <div className="field-error-text" style={{ fontSize: "10px", marginTop: "2px" }}>{formErrors.invoice_date}</div>
+                    )}
+                    <div className="hint">Defaults to today — change it if the invoice is dated earlier.</div>
+                  </div>
                 </div>
+
+                {/* Row 3: Invoice scan (full width) */}
                 <div className="field">
-                  <label>UOM</label>
-                  <select
-                    value={formState.uom}
-                    onChange={(e) => setFormState({ ...formState, uom: e.target.value })}
-                  >
-                    <option value="Bobbin">Bobbin</option>
-                    <option value="Grams">Grams</option>
-                  </select>
+                  <label>Invoice scan</label>
+                  <input type="file" disabled style={{ background: "var(--neutral-50)" }} />
+                  <div className="hint">Not functional in this preview.</div>
                 </div>
+
+                <div style={{ fontWeight: 600, fontSize: "14px", marginTop: "16px", marginBottom: "8px", borderBottom: "1px solid var(--neutral-200)", paddingBottom: "4px" }}>Line item</div>
+
+                {/* Row 4: Item & UOM (2 columns) */}
+                <div style={{ display: "grid", gridTemplateColumns: "1.5fr 1fr", gap: "12px" }}>
+                  <div className="field">
+                    <label>Item</label>
+                    <select
+                      value={formState.item}
+                      onChange={(e) => setFormState({ ...formState, item: e.target.value })}
+                    >
+                      {items.map((i, idx) => (
+                        <option key={idx} value={i.name}>
+                          {i.name}
+                        </option>
+                      ))}
+                    </select>
+                    <div className="hint">Item code (from Masters): <strong>{(items.find((i) => i.name === formState.item) || items[0])?.code}</strong></div>
+                  </div>
+                  <div className="field">
+                    <label>UOM</label>
+                    <select
+                      value={formState.uom}
+                      onChange={(e) => setFormState({ ...formState, uom: e.target.value })}
+                    >
+                      <option value="Bobbin">Bobbin</option>
+                      <option value="Grams">Grams</option>
+                    </select>
+                    <div className="hint">From Masters — changes which fields appear below.</div>
+                  </div>
+                </div>
+
+                {/* Row 5 & 6: UOM Dependent fields */}
+                {formState.uom === "Grams" ? (
+                  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "12px" }}>
+                    <div className={`field ${attempted && formErrors.qty_g ? "has-error" : ""}`}>
+                      <label>Quantity (g) <span className="req">*</span></label>
+                      <input
+                        type="number"
+                        value={formState.qty_g}
+                        onChange={(e) => setFormState({ ...formState, qty_g: e.target.value })}
+                      />
+                      {attempted && formErrors.qty_g && (
+                        <div className="field-error-text" style={{ fontSize: "10px", marginTop: "2px" }}>{formErrors.qty_g}</div>
+                      )}
+                    </div>
+                    <div className={`field ${attempted && formErrors.rate ? "has-error" : ""}`}>
+                      <label>Rate (₹ / g) <span className="req">*</span></label>
+                      <input
+                        type="number"
+                        step="0.01"
+                        value={formState.rate}
+                        onChange={(e) => setFormState({ ...formState, rate: e.target.value })}
+                      />
+                      {attempted && formErrors.rate && (
+                        <div className="field-error-text" style={{ fontSize: "10px", marginTop: "2px" }}>{formErrors.rate}</div>
+                      )}
+                    </div>
+                  </div>
+                ) : (
+                  <>
+                    <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "12px" }}>
+                      <div className={`field ${attempted && formErrors.bobbins ? "has-error" : ""}`}>
+                        <label>Bobbins <span className="req">*</span></label>
+                        <input
+                          type="number"
+                          value={formState.bobbins}
+                          onChange={(e) => setFormState({ ...formState, bobbins: e.target.value })}
+                        />
+                        {attempted && formErrors.bobbins && (
+                          <div className="field-error-text" style={{ fontSize: "10px", marginTop: "2px" }}>{formErrors.bobbins}</div>
+                        )}
+                      </div>
+                      <div className={`field ${attempted && formErrors.rate ? "has-error" : ""}`}>
+                        <label>Rate (₹ / Bobbin) <span className="req">*</span></label>
+                        <input
+                          type="number"
+                          step="0.01"
+                          value={formState.rate}
+                          onChange={(e) => setFormState({ ...formState, rate: e.target.value })}
+                        />
+                        {attempted && formErrors.rate && (
+                          <div className="field-error-text" style={{ fontSize: "10px", marginTop: "2px" }}>{formErrors.rate}</div>
+                        )}
+                      </div>
+                    </div>
+                    <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "12px" }}>
+                      <div className={`field ${attempted && formErrors.empty_g ? "has-error" : ""}`}>
+                        <label>Empty weight / bobbin (g) <span className="req">*</span></label>
+                        <input
+                          type="number"
+                          step="0.001"
+                          value={formState.empty_g}
+                          onChange={(e) => setFormState({ ...formState, empty_g: e.target.value })}
+                        />
+                        {attempted && formErrors.empty_g && (
+                          <div className="field-error-text" style={{ fontSize: "10px", marginTop: "2px" }}>{formErrors.empty_g}</div>
+                        )}
+                      </div>
+                      <div className={`field ${attempted && formErrors.gross_g ? "has-error" : ""}`}>
+                        <label>Gross weight / bobbin (g) <span className="req">*</span></label>
+                        <input
+                          type="number"
+                          step="0.001"
+                          value={formState.gross_g}
+                          onChange={(e) => setFormState({ ...formState, gross_g: e.target.value })}
+                        />
+                        {attempted && formErrors.gross_g && (
+                          <div className="field-error-text" style={{ fontSize: "10px", marginTop: "2px" }}>{formErrors.gross_g}</div>
+                        )}
+                      </div>
+                    </div>
+                  </>
+                )}
+
+                <div style={{ fontWeight: 600, fontSize: "14px", marginTop: "16px", marginBottom: "8px", borderBottom: "1px solid var(--neutral-200)", paddingBottom: "4px" }}>Freight</div>
+
+                {/* Freight charges */}
                 <div className={`field ${attempted && formErrors.freight ? "has-error" : ""}`}>
                   <label>Freight charges (₹)</label>
                   <input
@@ -681,124 +837,84 @@ export default function PurchasesPage() {
                   {attempted && formErrors.freight && (
                     <div className="field-error-text" style={{ fontSize: "10px", marginTop: "2px" }}>{formErrors.freight}</div>
                   )}
+                  <div className="hint">Added to the goods value before GST is calculated — GST is charged on goods + freight together.</div>
                 </div>
-              </div>
 
-              {/* Row 3: Bobbin inputs or Grams inputs */}
-              {formState.uom === "Grams" ? (
-                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "10px", marginBottom: "8px" }}>
-                  <div className={`field ${attempted && formErrors.qty_g ? "has-error" : ""}`}>
-                    <label>Quantity (g) <span className="req">*</span></label>
-                    <input
-                      type="number"
-                      value={formState.qty_g}
-                      onChange={(e) => setFormState({ ...formState, qty_g: e.target.value })}
-                    />
-                    {attempted && formErrors.qty_g && (
-                      <div className="field-error-text" style={{ fontSize: "10px", marginTop: "2px" }}>{formErrors.qty_g}</div>
-                    )}
-                  </div>
-                  <div className={`field ${attempted && formErrors.rate ? "has-error" : ""}`}>
-                    <label>Rate (₹ / g) <span className="req">*</span></label>
-                    <input
-                      type="number"
-                      step="0.01"
-                      value={formState.rate}
-                      onChange={(e) => setFormState({ ...formState, rate: e.target.value })}
-                    />
-                    {attempted && formErrors.rate && (
-                      <div className="field-error-text" style={{ fontSize: "10px", marginTop: "2px" }}>{formErrors.rate}</div>
-                    )}
-                  </div>
-                </div>
-              ) : (
-                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr 1fr", gap: "10px", marginBottom: "8px" }}>
-                  <div className={`field ${attempted && formErrors.bobbins ? "has-error" : ""}`}>
-                    <label>Bobbins <span className="req">*</span></label>
-                    <input
-                      type="number"
-                      value={formState.bobbins}
-                      onChange={(e) => setFormState({ ...formState, bobbins: e.target.value })}
-                    />
-                    {attempted && formErrors.bobbins && (
-                      <div className="field-error-text" style={{ fontSize: "10px", marginTop: "2px" }}>{formErrors.bobbins}</div>
-                    )}
-                  </div>
-                  <div className={`field ${attempted && formErrors.rate ? "has-error" : ""}`}>
-                    <label>Rate (₹ / Bobbin) <span className="req">*</span></label>
-                    <input
-                      type="number"
-                      step="0.01"
-                      value={formState.rate}
-                      onChange={(e) => setFormState({ ...formState, rate: e.target.value })}
-                    />
-                    {attempted && formErrors.rate && (
-                      <div className="field-error-text" style={{ fontSize: "10px", marginTop: "2px" }}>{formErrors.rate}</div>
-                    )}
-                  </div>
-                  <div className={`field ${attempted && formErrors.empty_g ? "has-error" : ""}`}>
-                    <label>Empty wt / bobbin (g) <span className="req">*</span></label>
-                    <input
-                      type="number"
-                      step="0.001"
-                      value={formState.empty_g}
-                      onChange={(e) => setFormState({ ...formState, empty_g: e.target.value })}
-                    />
-                    {attempted && formErrors.empty_g && (
-                      <div className="field-error-text" style={{ fontSize: "10px", marginTop: "2px" }}>{formErrors.empty_g}</div>
-                    )}
-                  </div>
-                  <div className={`field ${attempted && formErrors.gross_g ? "has-error" : ""}`}>
-                    <label>Gross wt / bobbin (g) <span className="req">*</span></label>
-                    <input
-                      type="number"
-                      step="0.001"
-                      value={formState.gross_g}
-                      onChange={(e) => setFormState({ ...formState, gross_g: e.target.value })}
-                    />
-                    {attempted && formErrors.gross_g && (
-                      <div className="field-error-text" style={{ fontSize: "10px", marginTop: "2px" }}>{formErrors.gross_g}</div>
-                    )}
-                  </div>
-                </div>
-              )}
+                <div style={{ fontWeight: 600, fontSize: "14px", marginTop: "16px", marginBottom: "8px", borderBottom: "1px solid var(--neutral-200)", paddingBottom: "4px" }}>Remarks (optional)</div>
 
-              {/* Row 4: Remarks & Live Calculations */}
-              <div style={{ display: "grid", gridTemplateColumns: "1.2fr 1fr", gap: "14px", marginTop: "4px" }}>
+                {/* Remarks */}
                 <div className="field">
-                  <label>Remarks</label>
                   <textarea
                     value={formState.remarks}
                     onChange={(e) => setFormState({ ...formState, remarks: e.target.value })}
-                    placeholder="Notes..."
-                    style={{ height: "64px", resize: "none" }}
+                    placeholder="Any notes about this purchase..."
+                    style={{ minHeight: "60px", resize: "vertical" }}
                   />
                 </div>
 
-                <div className="banner banner-neutral" style={{ padding: "8px 12px", margin: 0, height: "82px", display: "flex", alignItems: "center" }}>
-                  <div style={{ width: "100%" }}>
-                    <div className="recon-line" style={{ margin: "2px 0", fontSize: "11.5px" }}>
-                      <span className="l">Total net weight</span>
-                      <span className="num" style={{ fontWeight: 600 }}>{fmtG(calc.totalNet)} g</span>
+                {/* Live Calculations Preview */}
+                <div style={{ background: "var(--neutral-100)", borderRadius: "8px", padding: "16px", marginTop: "16px" }}>
+                  <div style={{ fontWeight: 600, fontSize: "13.5px", marginBottom: "12px", color: "var(--neutral-700)" }}>Preview — not the value that gets submitted</div>
+                  <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
+                    {formState.uom === "Bobbin" && (
+                      <div className="recon-line" style={{ fontSize: "13px" }}>
+                        <span className="l" style={{ color: "var(--neutral-600)" }}>Net weight / bobbin</span>
+                        <span className="num">{fmtG(calc.netPerUnit || 0)} g</span>
+                      </div>
+                    )}
+                    <div className="recon-line" style={{ fontSize: "13px" }}>
+                      <span className="l" style={{ color: "var(--neutral-600)" }}>Total net weight</span>
+                      <span className="num">{fmtG(calc.totalNet || 0)} g</span>
                     </div>
-                    <div className="recon-line" style={{ margin: "2px 0", fontSize: "11.5px" }}>
-                      <span className="l">Goods value</span>
-                      <span className="num" style={{ fontWeight: 600 }}>{fmtMoney(calc.taxableItem)}</span>
+                    <div className="recon-line" style={{ fontSize: "13px" }}>
+                      <span className="l" style={{ color: "var(--neutral-600)" }}>Goods value</span>
+                      <span className="num">{fmtMoney(calc.taxableItem || 0)}</span>
                     </div>
-                    <div className="recon-line" style={{ margin: "2px 0", fontSize: "11.5px", borderTop: "1px solid rgba(0,0,0,0.06)", paddingTop: "2px" }}>
-                      <span className="l" style={{ fontWeight: 600 }}>Total estimate</span>
-                      <span className="num" style={{ fontWeight: 700 }}>{fmtMoney(calc.total)}</span>
+                    <div className="recon-line" style={{ fontSize: "13px" }}>
+                      <span className="l" style={{ color: "var(--neutral-600)" }}>Freight</span>
+                      <span className="num">{fmtMoney(calc.freight || 0)}</span>
                     </div>
+                    <div className="recon-line" style={{ fontSize: "13px" }}>
+                      <span className="l" style={{ color: "var(--neutral-600)" }}>Taxable value (goods + freight)</span>
+                      <span className="num">{fmtMoney(calc.taxableBase || 0)}</span>
+                    </div>
+                    <div className="recon-line" style={{ fontSize: "13px" }}>
+                      <span className="l" style={{ color: "var(--neutral-600)" }}>GST rate (from item master)</span>
+                      <span className="num">{calc.gstPct ? calc.gstPct.toFixed(2) : "5.00"}%</span>
+                    </div>
+                    <div className="recon-line" style={{ fontSize: "13px", flexDirection: "column", alignItems: "flex-start", gap: "2px" }}>
+                      <div style={{ display: "flex", justifyContent: "space-between", width: "100%" }}>
+                        <span className="l" style={{ color: "var(--neutral-600)" }}>GST type</span>
+                        <span className="num" style={{ fontWeight: 600 }}>{calc.gst ? calc.gst.label : ""}</span>
+                      </div>
+                      {calc.gst && calc.gst.note && (
+                        <span className="muted" style={{ fontSize: "11.5px", color: "var(--neutral-500)", fontWeight: 400 }}>{calc.gst.note}</span>
+                      )}
+                    </div>
+                    <div className="recon-line" style={{ fontSize: "13px" }}>
+                      <span className="l" style={{ color: "var(--neutral-600)" }}>Landed cost / gram (est.)</span>
+                      <span className="num">{fmtMoney(calc.costPerGram || 0)}</span>
+                    </div>
+                    <div className="recon-line" style={{ fontSize: "14px", borderTop: "1px solid var(--neutral-300)", paddingTop: "8px", marginTop: "4px" }}>
+                      <span className="l" style={{ fontWeight: 700 }}>Total</span>
+                      <span className="num" style={{ fontWeight: 700, fontSize: "15px" }}>{fmtMoney(calc.total || 0)}</span>
+                    </div>
+                  </div>
+                  <div style={{ fontSize: "11px", color: "var(--neutral-500)", marginTop: "12px", lineHeight: "1.4" }}>
+                    The server recalculates net weight, the GST split, and cost per gram authoritatively on save — this preview is formatting only, never the submitted value.
                   </div>
                 </div>
               </div>
 
-              <div className="modal-actions" style={{ marginTop: "12px" }}>
+              <div className="modal-actions">
                 <button type="button" className="btn" onClick={() => setView(activePurchaseId ? "detail" : "list")}>
                   Cancel
                 </button>
+                <button type="button" className="btn" onClick={(e) => handleSaveForm(e, false)} disabled={submitting}>
+                  Save as draft
+                </button>
                 <button type="submit" className="btn btn-primary" disabled={submitting}>
-                  {submitting ? "Saving..." : activePurchaseId ? "Save changes" : "Save as draft"}
+                  {submitting ? "Saving..." : "Submit"}
                 </button>
               </div>
             </form>
