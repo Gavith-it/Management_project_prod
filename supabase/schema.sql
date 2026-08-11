@@ -322,30 +322,30 @@ ALTER TABLE public.stocktakes ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.stocktake_lines ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.audit_log ENABLE ROW LEVEL SECURITY;
 
--- Dynamic Policy: All authenticated users can read all tables
-CREATE POLICY "Allow read for all users" ON public.legal_entities FOR SELECT USING (true);
-CREATE POLICY "Allow read for all users" ON public.suppliers FOR SELECT USING (true);
-CREATE POLICY "Allow read for all users" ON public.items FOR SELECT USING (true);
-CREATE POLICY "Allow read for all users" ON public.item_gst_rates FOR SELECT USING (true);
-CREATE POLICY "Allow read for all users" ON public.stage_output_maps FOR SELECT USING (true);
-CREATE POLICY "Allow read for all users" ON public.locations FOR SELECT USING (true);
-CREATE POLICY "Allow read for all users" ON public.production_spaces FOR SELECT USING (true);
-CREATE POLICY "Allow read for all users" ON public.carriers FOR SELECT USING (true);
-CREATE POLICY "Allow read for all users" ON public.purchases FOR SELECT USING (true);
-CREATE POLICY "Allow read for all users" ON public.lots FOR SELECT USING (true);
-CREATE POLICY "Allow read for all users" ON public.stock_ledger FOR SELECT USING (true);
-CREATE POLICY "Allow read for all users" ON public.waste_entries FOR SELECT USING (true);
-CREATE POLICY "Allow read for all users" ON public.production_issues FOR SELECT USING (true);
-CREATE POLICY "Allow read for all users" ON public.production_issue_lines FOR SELECT USING (true);
-CREATE POLICY "Allow read for all users" ON public.job_cards FOR SELECT USING (true);
-CREATE POLICY "Allow read for all users" ON public.warping_logs FOR SELECT USING (true);
-CREATE POLICY "Allow read for all users" ON public.returns FOR SELECT USING (true);
-CREATE POLICY "Allow read for all users" ON public.return_lines FOR SELECT USING (true);
-CREATE POLICY "Allow read for all users" ON public.warping_close FOR SELECT USING (true);
-CREATE POLICY "Allow read for all users" ON public.stage_completions FOR SELECT USING (true);
-CREATE POLICY "Allow read for all users" ON public.stocktakes FOR SELECT USING (true);
-CREATE POLICY "Allow read for all users" ON public.stocktake_lines FOR SELECT USING (true);
-CREATE POLICY "Allow read for all users" ON public.audit_log FOR SELECT USING (true);
+-- Dynamic Policy: Allow all operations (select, insert, update, delete) for all users
+CREATE POLICY "Allow all operations for all users" ON public.legal_entities FOR ALL USING (true) WITH CHECK (true);
+CREATE POLICY "Allow all operations for all users" ON public.suppliers FOR ALL USING (true) WITH CHECK (true);
+CREATE POLICY "Allow all operations for all users" ON public.items FOR ALL USING (true) WITH CHECK (true);
+CREATE POLICY "Allow all operations for all users" ON public.item_gst_rates FOR ALL USING (true) WITH CHECK (true);
+CREATE POLICY "Allow all operations for all users" ON public.stage_output_maps FOR ALL USING (true) WITH CHECK (true);
+CREATE POLICY "Allow all operations for all users" ON public.locations FOR ALL USING (true) WITH CHECK (true);
+CREATE POLICY "Allow all operations for all users" ON public.production_spaces FOR ALL USING (true) WITH CHECK (true);
+CREATE POLICY "Allow all operations for all users" ON public.carriers FOR ALL USING (true) WITH CHECK (true);
+CREATE POLICY "Allow all operations for all users" ON public.purchases FOR ALL USING (true) WITH CHECK (true);
+CREATE POLICY "Allow all operations for all users" ON public.lots FOR ALL USING (true) WITH CHECK (true);
+CREATE POLICY "Allow all operations for all users" ON public.stock_ledger FOR ALL USING (true) WITH CHECK (true);
+CREATE POLICY "Allow all operations for all users" ON public.waste_entries FOR ALL USING (true) WITH CHECK (true);
+CREATE POLICY "Allow all operations for all users" ON public.production_issues FOR ALL USING (true) WITH CHECK (true);
+CREATE POLICY "Allow all operations for all users" ON public.production_issue_lines FOR ALL USING (true) WITH CHECK (true);
+CREATE POLICY "Allow all operations for all users" ON public.job_cards FOR ALL USING (true) WITH CHECK (true);
+CREATE POLICY "Allow all operations for all users" ON public.warping_logs FOR ALL USING (true) WITH CHECK (true);
+CREATE POLICY "Allow all operations for all users" ON public.returns FOR ALL USING (true) WITH CHECK (true);
+CREATE POLICY "Allow all operations for all users" ON public.return_lines FOR ALL USING (true) WITH CHECK (true);
+CREATE POLICY "Allow all operations for all users" ON public.warping_close FOR ALL USING (true) WITH CHECK (true);
+CREATE POLICY "Allow all operations for all users" ON public.stage_completions FOR ALL USING (true) WITH CHECK (true);
+CREATE POLICY "Allow all operations for all users" ON public.stocktakes FOR ALL USING (true) WITH CHECK (true);
+CREATE POLICY "Allow all operations for all users" ON public.stocktake_lines FOR ALL USING (true) WITH CHECK (true);
+CREATE POLICY "Allow all operations for all users" ON public.audit_log FOR ALL USING (true) WITH CHECK (true);
 
 -- Mutations policies based on permissions matrix will be gated by role mapping
 -- Example: Admin & Inv_Sup can write/edit purchases
