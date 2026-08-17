@@ -8,12 +8,12 @@ const INITIAL_SEED = {
     { id: 3, name: 'Narend', role: 'operator', roleLabel: 'Operator' }
   ],
   legalEntities: [
-    { id: 1, name: 'Maradi Zari Works Pvt Ltd', gstin: '29AAMCM1234F1Z8', state_code: '29', state_name: 'Karnataka' }
+    { id: 1, name: 'Maradi Zari Works Pvt Ltd', gstin: '29AAMCM1234F1Z8', state_code: '29', state_name: 'Karnataka', address: null }
   ],
   suppliers: [
-    { name: 'Suraj Zari Threads Pvt Ltd', state_code: '29', state_name: 'Karnataka', gstin: '29ABCDE1234F1Z5', address: 'Plot 14, Peenya Industrial Area, Bengaluru', payment_terms: 'Net 30' },
-    { name: 'Kanchi Silk & Zari Co.', state_code: '33', state_name: 'Tamil Nadu', gstin: '33PQRSX5678K1Z2', address: '44 Mint Street, Chennai', payment_terms: 'Net 45' },
-    { name: 'Ganga Handloom Supplies', state_code: '29', state_name: 'Karnataka', gstin: null, address: '12 Weavers Colony, Mysuru', payment_terms: 'Advance' }
+    { name: 'Suraj Zari Threads Pvt Ltd', state_code: '29', state_name: 'Karnataka', gstin: '29ABCDE1234F1Z5', address: 'Plot 14, Peenya Industrial Area, Bengaluru', payment_terms: 'Net 30', pan_no: null, email: null, phone_no: null },
+    { name: 'Kanchi Silk & Zari Co.', state_code: '33', state_name: 'Tamil Nadu', gstin: '33PQRSX5678K1Z2', address: '44 Mint Street, Chennai', payment_terms: 'Net 45', pan_no: null, email: null, phone_no: null },
+    { name: 'Ganga Handloom Supplies', state_code: '29', state_name: 'Karnataka', gstin: null, address: '12 Weavers Colony, Mysuru', payment_terms: 'Advance', pan_no: null, email: null, phone_no: null }
   ],
   items: [
     { id: 1, name: 'Zari thread — 90 count', code: 'ZR-001', type: 'Raw zari', uom: 'Grams', hsn: '5605' },
@@ -125,8 +125,8 @@ const TABLE_MAP = {
 
 const TABLE_COLUMNS = {
   profiles: ["id", "name", "role", "role_label", "created_at"],
-  legal_entities: ["id", "name", "gstin", "state_code", "state_name"],
-  suppliers: ["name", "state_code", "state_name", "gstin", "address", "payment_terms"],
+  legal_entities: ["id", "name", "gstin", "state_code", "state_name", "address"],
+  suppliers: ["name", "state_code", "state_name", "gstin", "address", "payment_terms", "pan_no", "email", "phone_no"],
   items: ["id", "name", "code", "type", "uom", "hsn"],
   item_gst_rates: ["id", "item", "rate_pct", "effective_from", "effective_to"],
   stage_output_maps: ["id", "stage", "input_item", "output_item", "waste_item"],
