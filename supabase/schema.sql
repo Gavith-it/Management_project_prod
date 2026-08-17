@@ -12,16 +12,8 @@ CREATE TABLE IF NOT EXISTS public.profiles (
 -- Enable RLS on Profiles
 ALTER TABLE public.profiles ENABLE ROW LEVEL SECURITY;
 
-CREATE POLICY "Allow users to read profiles" ON public.profiles
-    FOR SELECT USING (true);
-
-CREATE POLICY "Allow admins to update profiles" ON public.profiles
-    FOR ALL USING (
-        EXISTS (
-            SELECT 1 FROM public.profiles
-            WHERE profiles.id = auth.uid() AND profiles.role = 'admin'
-        )
-    );
+CREATE POLICY "Allow all operations for all users" ON public.profiles
+    FOR ALL USING (true) WITH CHECK (true);
 
 -- 2. MASTER DATA
 CREATE TABLE IF NOT EXISTS public.legal_entities (
@@ -29,7 +21,8 @@ CREATE TABLE IF NOT EXISTS public.legal_entities (
     name TEXT NOT NULL,
     gstin TEXT NOT NULL,
     state_code TEXT NOT NULL,
-    state_name TEXT NOT NULL
+    state_name TEXT NOT NULL,
+    address TEXT
 );
 
 CREATE TABLE IF NOT EXISTS public.suppliers (
@@ -38,7 +31,10 @@ CREATE TABLE IF NOT EXISTS public.suppliers (
     state_name TEXT NOT NULL,
     gstin TEXT,
     address TEXT NOT NULL,
-    payment_terms TEXT NOT NULL
+    payment_terms TEXT NOT NULL,
+    pan_no TEXT,
+    email TEXT,
+    phone_no TEXT
 );
 
 CREATE TABLE IF NOT EXISTS public.items (
@@ -82,7 +78,7 @@ CREATE TABLE IF NOT EXISTS public.production_spaces (
 
 CREATE TABLE IF NOT EXISTS public.carriers (
     code TEXT PRIMARY KEY,
-    type TEXT NOT NULL CHECK (type IN ('Beam', 'Pirn tube')),
+    type TEXT NOT NULL CHECK (type IN ('Beam', 'Pirn tube', 'Pagadi')),
     empty_g NUMERIC(12,3) NOT NULL
 );
 

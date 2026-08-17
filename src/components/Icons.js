@@ -18,7 +18,9 @@ const ICON_PATHS = {
   scale: '<path d="M12 3v18"/><path d="M4.5 8h6M13.5 8h6"/><path d="M4.5 8 2 13.5a2.7 2.7 0 0 0 5 0L4.5 8Z"/><path d="M19.5 8 17 13.5a2.7 2.7 0 0 0 5 0L19.5 8Z"/><path d="M8.5 21h7"/>',
   users: '<circle cx="8.5" cy="8" r="3"/><path d="M2.5 20a6.5 6.5 0 0 1 12 0"/><circle cx="17" cy="9" r="2.5"/><path d="M15 13.3A5.6 5.6 0 0 1 21.5 20"/>',
   download: '<path d="M12 3v12"/><path d="M7 10.5 12 15l5-4.5"/><path d="M4.5 19.5h15"/>',
-  arrowR: '<path d="M4 12h16"/><path d="M14 6l6 6-6 6"/>'
+  arrowR: '<path d="M4 12h16"/><path d="M14 6l6 6-6 6"/>',
+  camera: '<path d="M14.5 4h-5L7.8 7H4.5A2.5 2.5 0 0 0 2 9.5v8A2.5 2.5 0 0 0 4.5 20h15a2.5 2.5 0 0 0 2.5-2.5v-8A2.5 2.5 0 0 0 19.5 7h-3.3L14.5 4Z"/><circle cx="12" cy="13.5" r="3"/>',
+  trash: '<path d="M3 6h18M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2M10 11v6M14 11v6"/>'
 };
 
 export default function Icon({ name, size = 18, className = "" }) {
