@@ -219,7 +219,7 @@ export default function PurchasesPage() {
     setSubmitting(true);
     try {
       const calc = computePurchaseTotals(formState, suppliers, itemGstRates, ourStateCode());
-      const selectedItem = items.find((i) => i.name === formState.item) || items[0];
+      const selectedItem = items.find((i) => i.name === formState.item) || items[0] || { name: "Zari Yarn", code: "ZARI-01" };
 
       // Format Purchase Head
       const pId = activePurchaseId || `PUR-${String(12 + purchases.length).padStart(6, "0")}`;
