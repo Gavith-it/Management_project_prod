@@ -198,6 +198,36 @@ const fromSnakeCaseRow = (row) => {
   if (row.finalized_at !== undefined) mapped.finalizedAt = row.finalized_at;
   if (row.approved_at !== undefined) mapped.approvedAt = row.approved_at;
   if (row.approved_by !== undefined) mapped.approvedBy = row.approved_by;
+
+  // Reconstruct lines array for purchases from serialized remarks or default columns
+  if (row.invoice_no !== undefined) {
+    if (row.remarks && row.remarks.includes(" ||LINES||")) {
+      const parts = row.remarks.split(" ||LINES||");
+      mapped.remarks = parts[0];
+      try {
+        mapped.lines = JSON.parse(parts[1]);
+      } catch (e) {
+        mapped.lines = [];
+      }
+    }
+    
+    // If lines array is missing or empty, build a fallback using columns
+    if (!mapped.lines || mapped.lines.length === 0) {
+      mapped.lines = [
+        {
+          item: "Zari Yarn", // Default fallback if no lines stored
+          item_code: "ZARI-01",
+          uom: row.uom || "Bobbin",
+          qty: row.qty,
+          empty_g: row.empty_per_unit_g,
+          gross_g: row.gross_per_unit_g,
+          net_g: row.net_g,
+          rate: `₹${(row.rate_per_unit || 0).toFixed(2)} / ${(row.uom || "bobbin").toLowerCase()}`
+        }
+      ];
+    }
+  }
+
   return mapped;
 };
 
