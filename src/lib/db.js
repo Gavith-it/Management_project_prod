@@ -8,12 +8,12 @@ const INITIAL_SEED = {
     { id: 3, name: 'Narend', role: 'operator', roleLabel: 'Operator' }
   ],
   legalEntities: [
-    { id: 1, name: 'Maradi Zari Works Pvt Ltd', gstin: '29AAMCM1234F1Z8', state_code: '29', state_name: 'Karnataka' }
+    { id: 1, name: 'Maradi Zari Works Pvt Ltd', gstin: '29AAMCM1234F1Z8', state_code: '29', state_name: 'Karnataka', address: null }
   ],
   suppliers: [
-    { name: 'Suraj Zari Threads Pvt Ltd', state_code: '29', state_name: 'Karnataka', gstin: '29ABCDE1234F1Z5', address: 'Plot 14, Peenya Industrial Area, Bengaluru', payment_terms: 'Net 30' },
-    { name: 'Kanchi Silk & Zari Co.', state_code: '33', state_name: 'Tamil Nadu', gstin: '33PQRSX5678K1Z2', address: '44 Mint Street, Chennai', payment_terms: 'Net 45' },
-    { name: 'Ganga Handloom Supplies', state_code: '29', state_name: 'Karnataka', gstin: null, address: '12 Weavers Colony, Mysuru', payment_terms: 'Advance' }
+    { name: 'Suraj Zari Threads Pvt Ltd', state_code: '29', state_name: 'Karnataka', gstin: '29ABCDE1234F1Z5', address: 'Plot 14, Peenya Industrial Area, Bengaluru', payment_terms: 'Net 30', pan_no: null, email: null, phone_no: null },
+    { name: 'Kanchi Silk & Zari Co.', state_code: '33', state_name: 'Tamil Nadu', gstin: '33PQRSX5678K1Z2', address: '44 Mint Street, Chennai', payment_terms: 'Net 45', pan_no: null, email: null, phone_no: null },
+    { name: 'Ganga Handloom Supplies', state_code: '29', state_name: 'Karnataka', gstin: null, address: '12 Weavers Colony, Mysuru', payment_terms: 'Advance', pan_no: null, email: null, phone_no: null }
   ],
   items: [
     { id: 1, name: 'Zari thread — 90 count', code: 'ZR-001', type: 'Raw zari', uom: 'Grams', hsn: '5605' },
@@ -125,8 +125,8 @@ const TABLE_MAP = {
 
 const TABLE_COLUMNS = {
   profiles: ["id", "name", "role", "role_label", "created_at"],
-  legal_entities: ["id", "name", "gstin", "state_code", "state_name"],
-  suppliers: ["name", "state_code", "state_name", "gstin", "address", "payment_terms"],
+  legal_entities: ["id", "name", "gstin", "state_code", "state_name", "address"],
+  suppliers: ["name", "state_code", "state_name", "gstin", "address", "payment_terms", "pan_no", "email", "phone_no"],
   items: ["id", "name", "code", "type", "uom", "hsn"],
   item_gst_rates: ["id", "item", "rate_pct", "effective_from", "effective_to"],
   stage_output_maps: ["id", "stage", "input_item", "output_item", "waste_item"],
@@ -198,6 +198,40 @@ const fromSnakeCaseRow = (row) => {
   if (row.finalized_at !== undefined) mapped.finalizedAt = row.finalized_at;
   if (row.approved_at !== undefined) mapped.approvedAt = row.approved_at;
   if (row.approved_by !== undefined) mapped.approvedBy = row.approved_by;
+
+  // Reconstruct lines array for purchases from serialized remarks or default columns
+  if (row.invoice_no !== undefined) {
+    if (row.remarks && row.remarks.includes(" ||LINES||")) {
+      const parts = row.remarks.split(" ||LINES||");
+      mapped.remarks = parts[0];
+      try {
+        mapped.lines = JSON.parse(parts[1]).map(l => ({
+          ...l,
+          item: l.item === "Zari Yarn" || !l.item ? "Zari thread — 90 count" : l.item,
+          item_code: l.item_code === "ZARI-01" || !l.item_code ? "ZR-001" : l.item_code
+        }));
+      } catch (e) {
+        mapped.lines = [];
+      }
+    }
+    
+    // If lines array is missing or empty, build a fallback using columns
+    if (!mapped.lines || mapped.lines.length === 0) {
+      mapped.lines = [
+        {
+          item: "Zari thread — 90 count", // Default fallback if no lines stored
+          item_code: "ZR-001",
+          uom: row.uom || "Bobbin",
+          qty: row.qty,
+          empty_g: row.empty_per_unit_g,
+          gross_g: row.gross_per_unit_g,
+          net_g: row.net_g,
+          rate: `₹${(row.rate_per_unit || 0).toFixed(2)} / ${(row.uom || "bobbin").toLowerCase()}`
+        }
+      ];
+    }
+  }
+
   return mapped;
 };
 

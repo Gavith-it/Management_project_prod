@@ -40,7 +40,12 @@ export default function MastersPage() {
     try {
       const dbState = {};
       for (const cat of CATEGORIES) {
-        dbState[cat.entity] = await db.get(cat.entity);
+        try {
+          dbState[cat.entity] = await db.get(cat.entity);
+        } catch (err) {
+          console.error(`Failed to load master category ${cat.entity}:`, err);
+          dbState[cat.entity] = []; // Fallback to empty array if query fails
+        }
       }
       setData(dbState);
       setLoading(false);
@@ -55,6 +60,12 @@ export default function MastersPage() {
     setUser(activeUser);
     loadData();
   }, []);
+
+  useEffect(() => {
+    if (notification) {
+      window.scrollTo({ top: 0, behavior: "smooth" });
+    }
+  }, [notification]);
 
   const handleScrollTo = (targetId) => {
     const el = document.getElementById(targetId);
@@ -79,6 +90,9 @@ export default function MastersPage() {
           { key: "name", label: "Supplier", chip: true },
           { key: "state_name", label: "State" },
           { key: "gstin", label: "GSTIN", fmt: (v) => v || "Unregistered (reverse charge)" },
+          { key: "pan_no", label: "PAN no." },
+          { key: "email", label: "Email" },
+          { key: "phone_no", label: "Phone no." },
           { key: "payment_terms", label: "Payment terms" }
         ],
         fields: [
@@ -87,6 +101,9 @@ export default function MastersPage() {
           { key: "state_code", label: "State code", type: "text", required: true, placeholder: "e.g. 29" },
           { key: "state_name", label: "State name", type: "text", required: true, placeholder: "e.g. Karnataka" },
           { key: "gstin", label: "GSTIN (leave blank if unregistered)", type: "text", placeholder: "e.g. 29ABCDE1234F1Z5" },
+          { key: "pan_no", label: "PAN no.", type: "text", placeholder: "e.g. ABCDE1234F" },
+          { key: "email", label: "Email", type: "text", placeholder: "e.g. contact@supplier.com" },
+          { key: "phone_no", label: "Phone number", type: "text", placeholder: "e.g. +91 98765 43210" },
           { key: "payment_terms", label: "Payment terms", type: "select", options: ["Advance", "Net 15", "Net 30", "Net 45", "Net 60"] }
         ],
         validate: (form, id) => {
@@ -110,6 +127,9 @@ export default function MastersPage() {
           state_code: form.state_code.trim(),
           state_name: form.state_name.trim(),
           gstin: form.gstin?.trim() || null,
+          pan_no: form.pan_no?.trim() || null,
+          email: form.email?.trim() || null,
+          phone_no: form.phone_no?.trim() || null,
           payment_terms: form.payment_terms || "Net 30"
         })
       },
@@ -248,13 +268,15 @@ export default function MastersPage() {
           { key: "name", label: "Legal entity", chip: true },
           { key: "gstin", label: "GSTIN" },
           { key: "state_name", label: "State" },
-          { key: "state_code", label: "gst_state_code" }
+          { key: "state_code", label: "gst_state_code" },
+          { key: "address", label: "Address", fmt: (v) => v || "Not specified" }
         ],
         fields: [
           { key: "name", label: "Legal entity name", type: "text", required: true },
           { key: "gstin", label: "GSTIN", type: "text", required: true, placeholder: "e.g. 29AAMCM1234F1Z8" },
           { key: "state_code", label: "GST state code", type: "text", required: true, placeholder: "e.g. 29" },
-          { key: "state_name", label: "State name", type: "text", required: true, placeholder: "e.g. Karnataka" }
+          { key: "state_name", label: "State name", type: "text", required: true, placeholder: "e.g. Karnataka" },
+          { key: "address", label: "Company address", type: "text", required: false, placeholder: "e.g. Plot 14, Peenya Industrial Area, Bengaluru" }
         ],
         validate: (form) => {
           const errors = {};
@@ -268,7 +290,8 @@ export default function MastersPage() {
           name: form.name.trim(),
           gstin: form.gstin.trim(),
           state_code: form.state_code.trim(),
-          state_name: form.state_name.trim()
+          state_name: form.state_name.trim(),
+          address: form.address?.trim() || null
         })
       },
       locations: {
@@ -337,7 +360,7 @@ export default function MastersPage() {
         ],
         fields: [
           { key: "code", label: "Carrier code", type: "text", required: true, placeholder: "e.g. BEAM-21" },
-          { key: "type", label: "Type", type: "select", options: ["Beam", "Pirn tube"] },
+          { key: "type", label: "Type", type: "select", options: ["Beam", "Pirn tube", "Pagadi"] },
           { key: "empty_g", label: "Certified empty weight (g)", type: "number", step: "0.001", required: true }
         ],
         validate: (form, id) => {

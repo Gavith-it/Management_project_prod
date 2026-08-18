@@ -28,6 +28,7 @@ export default function OfficeDashboardPage() {
   const [purchases, setPurchases] = useState([]);
   const [itemGstRates, setItemGstRates] = useState({});
   const [legalEntities, setLegalEntities] = useState([]);
+  const [uoms, setUoms] = useState([]);
   
   const [submitting, setSubmitting] = useState(false);
   const [attempted, setAttempted] = useState(false);
@@ -44,7 +45,8 @@ export default function OfficeDashboardPage() {
     freight: "",
     remarks: "",
     invoice_no: "",
-    invoice_date: ""
+    invoice_date: "",
+    invoice_file: null
   });
 
   const getGreeting = () => {
@@ -73,12 +75,14 @@ export default function OfficeDashboardPage() {
       const rList = await db.get("itemGstRates");
       const iList = await db.get("items");
       const lList = await db.get("legalEntities");
+      const uomList = await db.get("uoms");
 
       setPurchases(pList);
       setSuppliers(sList);
       setItemGstRates(rList);
       setItems(iList);
       setLegalEntities(lList);
+      setUoms(uomList || []);
 
       const openWarping = warpingClose && warpingClose.status !== "closed" && warpingClose.status !== "flagged" ? 1 : 0;
       const openStageComps = (stageCompletions || []).filter(
@@ -222,19 +226,56 @@ export default function OfficeDashboardPage() {
     return errors;
   };
 
+  const handleFileChange = (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onloadend = () => {
+      setFormState((prev) => ({
+        ...prev,
+        invoice_file: JSON.stringify({ name: file.name, data: reader.result })
+      }));
+    };
+    reader.readAsDataURL(file);
+  };
+
+  const handleClearFile = () => {
+    setFormState((prev) => ({
+      ...prev,
+      invoice_file: null
+    }));
+  };
+
   const handleSaveForm = async (e, isSubmit = false) => {
     if (e) e.preventDefault();
     const errors = validateForm(formState);
+    
+    // For draft saving, bypass strict validation
+    if (!isSubmit) {
+      delete errors.qty_g;
+      delete errors.bobbins;
+      delete errors.rate;
+      delete errors.empty_g;
+      delete errors.gross_g;
+      delete errors.freight;
+    }
+
     setFormErrors(errors);
     setAttempted(true);
 
     if (Object.keys(errors).length > 0) return;
 
+    if (isSubmit) {
+      const confirmed = window.confirm("Are you sure you want to submit this purchase? Once submitted, it cannot be edited later.");
+      if (!confirmed) return;
+    }
+
     setSubmitting(true);
     try {
       const calc = computePurchaseTotals(formState, suppliers, itemGstRates, ourStateCode());
-      const selectedItem = items.find((i) => i.name === formState.item) || items[0];
+      const selectedItem = items.find((i) => i.name === formState.item) || items[0] || { name: "Zari thread — 90 count", code: "ZR-001" };
 
+      // Format Purchase Head
       const pId = `PUR-${String(12 + purchases.length).padStart(6, "0")}`;
       const batchId = `BATCH-2627-${String(purchases.length + 1).padStart(5, "0")}`;
 
@@ -262,7 +303,7 @@ export default function OfficeDashboardPage() {
         total: calc.total,
         cost_per_gram: calc.costPerGram,
         remarks: formState.remarks || "",
-        invoice_file: "INV-scan.pdf",
+        invoice_file: formState.invoice_file || null,
         lines: [
           {
             item: selectedItem.name,
@@ -277,6 +318,9 @@ export default function OfficeDashboardPage() {
         ],
         reversal: null
       };
+
+      // Serialize lines into remarks column to persist across Supabase column limits
+      newPurchase.remarks = (formState.remarks || "") + " ||LINES||" + JSON.stringify(newPurchase.lines);
 
       await db.save("purchases", newPurchase, "id", pId);
 
@@ -524,8 +568,72 @@ export default function OfficeDashboardPage() {
                 {/* Row 3: Invoice scan (full width) */}
                 <div className="field">
                   <label>Invoice scan</label>
-                  <input type="file" disabled style={{ background: "var(--neutral-50)" }} />
-                  <div className="hint">Not functional in this preview.</div>
+                  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "12px", marginBottom: "8px" }}>
+                    <div>
+                      <button 
+                        type="button" 
+                        className="btn btn-secondary" 
+                        style={{ width: "100%", height: "38px", display: "flex", alignItems: "center", justifyContent: "center", gap: "6px", background: "var(--neutral-100)", border: "1px solid var(--neutral-300)", borderRadius: "var(--radius-s)", fontSize: "13px", fontWeight: "600", cursor: "pointer" }}
+                        onClick={() => document.getElementById("file-upload").click()}
+                      >
+                        <Icon name="file" size={16} />
+                        Choose file
+                      </button>
+                      <input 
+                        id="file-upload" 
+                        type="file" 
+                        accept="image/*,application/pdf"
+                        style={{ display: "none" }} 
+                        onChange={handleFileChange}
+                      />
+                    </div>
+                    <div>
+                      <button 
+                        type="button" 
+                        className="btn btn-secondary" 
+                        style={{ width: "100%", height: "38px", display: "flex", alignItems: "center", justifyContent: "center", gap: "6px", background: "var(--neutral-100)", border: "1px solid var(--neutral-300)", borderRadius: "var(--radius-s)", fontSize: "13px", fontWeight: "600", cursor: "pointer" }}
+                        onClick={() => document.getElementById("photo-capture").click()}
+                      >
+                        <Icon name="camera" size={16} />
+                        Take Photo
+                      </button>
+                      <input 
+                        id="photo-capture" 
+                        type="file" 
+                        accept="image/*"
+                        capture="environment"
+                        style={{ display: "none" }} 
+                        onChange={handleFileChange}
+                      />
+                    </div>
+                  </div>
+                  {formState.invoice_file && (() => {
+                    let fileData = null;
+                    if (formState.invoice_file === "INV-scan.pdf") {
+                      fileData = { name: "INV-scan.pdf" };
+                    } else {
+                      try {
+                        fileData = JSON.parse(formState.invoice_file);
+                      } catch (e) {
+                        fileData = { name: "Invoice file" };
+                      }
+                    }
+                    return fileData ? (
+                      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", background: "var(--neutral-50)", padding: "8px 12px", borderRadius: "6px", border: "1px solid var(--neutral-200)", marginTop: "8px" }}>
+                        <div style={{ display: "flex", alignItems: "center", gap: "8px", overflow: "hidden" }}>
+                          <Icon name="check" size={16} style={{ color: "var(--success-600)" }} />
+                          <span style={{ fontSize: "12px", fontWeight: 600, textOverflow: "ellipsis", overflow: "hidden", whiteSpace: "nowrap" }}>{fileData.name}</span>
+                        </div>
+                        <button 
+                          type="button" 
+                          onClick={handleClearFile} 
+                          style={{ background: "none", border: "none", color: "var(--danger-600)", cursor: "pointer", display: "flex", alignItems: "center", padding: "4px" }}
+                        >
+                          <Icon name="trash" size={16} />
+                        </button>
+                      </div>
+                    ) : null;
+                  })()}
                 </div>
 
                 <div style={{ fontWeight: 600, fontSize: "14px", marginTop: "16px", marginBottom: "8px", borderBottom: "1px solid var(--neutral-200)", paddingBottom: "4px" }}>Line item</div>
@@ -552,8 +660,11 @@ export default function OfficeDashboardPage() {
                       value={formState.uom}
                       onChange={(e) => setFormState({ ...formState, uom: e.target.value })}
                     >
-                      <option value="Bobbin">Bobbin</option>
-                      <option value="Grams">Grams</option>
+                      {uoms.map((u) => (
+                        <option key={u.id || u.name} value={u.name}>
+                          {u.name}
+                        </option>
+                      ))}
                     </select>
                     <div className="hint">From Masters — changes which fields appear below.</div>
                   </div>
@@ -590,7 +701,7 @@ export default function OfficeDashboardPage() {
                   <>
                     <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "12px" }}>
                       <div className={`field ${attempted && formErrors.bobbins ? "has-error" : ""}`}>
-                        <label>Bobbins <span className="req">*</span></label>
+                        <label>{formState.uom === "Bobbin" ? "Bobbins" : formState.uom === "Mark" ? "Marks" : formState.uom} <span className="req">*</span></label>
                         <input
                           type="number"
                           value={formState.bobbins}
@@ -601,7 +712,7 @@ export default function OfficeDashboardPage() {
                         )}
                       </div>
                       <div className={`field ${attempted && formErrors.rate ? "has-error" : ""}`}>
-                        <label>Rate (₹ / Bobbin) <span className="req">*</span></label>
+                        <label>Rate (₹ / {formState.uom}) <span className="req">*</span></label>
                         <input
                           type="number"
                           step="0.01"
@@ -615,7 +726,7 @@ export default function OfficeDashboardPage() {
                     </div>
                     <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "12px" }}>
                       <div className={`field ${attempted && formErrors.empty_g ? "has-error" : ""}`}>
-                        <label>Empty weight / bobbin (g) <span className="req">*</span></label>
+                        <label>Empty weight / {formState.uom.toLowerCase()} (g) <span className="req">*</span></label>
                         <input
                           type="number"
                           step="0.001"
@@ -627,7 +738,7 @@ export default function OfficeDashboardPage() {
                         )}
                       </div>
                       <div className={`field ${attempted && formErrors.gross_g ? "has-error" : ""}`}>
-                        <label>Gross weight / bobbin (g) <span className="req">*</span></label>
+                        <label>Gross weight / {formState.uom.toLowerCase()} (g) <span className="req">*</span></label>
                         <input
                           type="number"
                           step="0.001"
@@ -676,9 +787,9 @@ export default function OfficeDashboardPage() {
                 <div style={{ background: "var(--neutral-100)", borderRadius: "8px", padding: "16px", marginTop: "16px" }}>
                   <div style={{ fontWeight: 600, fontSize: "13.5px", marginBottom: "12px", color: "var(--neutral-700)" }}>Preview — not the value that gets submitted</div>
                   <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
-                    {formState.uom === "Bobbin" && (
+                    {formState.uom !== "Grams" && (
                       <div className="recon-line" style={{ fontSize: "13px" }}>
-                        <span className="l" style={{ color: "var(--neutral-600)" }}>Net weight / bobbin</span>
+                        <span className="l" style={{ color: "var(--neutral-600)" }}>Net weight / {formState.uom.toLowerCase()}</span>
                         <span className="num">{fmtG(calc.netPerUnit || 0)} g</span>
                       </div>
                     )}
@@ -722,6 +833,10 @@ export default function OfficeDashboardPage() {
                   </div>
                   <div style={{ fontSize: "11px", color: "var(--neutral-500)", marginTop: "12px", lineHeight: "1.4" }}>
                     The server recalculates net weight, the GST split, and cost per gram authoritatively on save — this preview is formatting only, never the submitted value.
+                  </div>
+                  <div style={{ display: "flex", alignItems: "center", gap: "6px", color: "var(--warning-700)", fontSize: "11.5px", fontWeight: 600, marginTop: "12px", background: "var(--warning-50)", border: "1px solid var(--warning-200)", padding: "8px 12px", borderRadius: "6px" }}>
+                    <Icon name="alert" size={14} style={{ color: "var(--warning-600)", flexShrink: 0 }} />
+                    <span>Once submitted, this purchase is posted to the ledger and cannot be edited.</span>
                   </div>
                 </div>
               </div>
