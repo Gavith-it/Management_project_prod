@@ -966,6 +966,11 @@ export default function PurchasesPage() {
                         )}
                       </div>
                     </div>
+                    {formState.uom === "Mark" && (
+                      <div style={{ fontSize: "11px", color: "var(--neutral-600)", marginTop: "6px", fontStyle: "italic", background: "var(--neutral-50)", padding: "6px 10px", borderRadius: "4px", borderLeft: "3px solid var(--primary)" }}>
+                        ℹ️ <strong>UOM is Mark (1 Mark = 4 Bobbins)</strong>: Enter the weights per bobbin. The system automatically multiplies these by 4 (e.g. {formState.empty_g || 16}g empty becomes {Number(formState.empty_g || 16) * 4}g, {formState.gross_g || ""}g gross becomes {Number(formState.gross_g || 0) * 4}g) to compute the correct total net weight.
+                      </div>
+                    )}
                   </>
                 )}
 

@@ -64,8 +64,10 @@ export function computePurchaseTotals(form, suppliers, itemGstRates, ourStateCod
     totalNet = qty;
     taxableItem = qty * ratePerUnit;
   } else {
-    empty = Number(form.empty_g || 0);
-    gross = Number(form.gross_g || 0);
+    const isMark = uom === 'Mark';
+    const mult = isMark ? 4 : 1;
+    empty = Number(form.empty_g || 0) * mult;
+    gross = Number(form.gross_g || 0) * mult;
     qty = Number(form.bobbins || 0);
     ratePerUnit = Number(form.rate || 0);
     netPerUnit = Math.max(0, gross - empty);
