@@ -64,6 +64,7 @@ export default function OfficeDashboardPage() {
 
   const loadDashboardData = async () => {
     try {
+      const iList = await db.get("items");
       const pList = await db.get("purchases");
       const lots = await db.get("lots");
       const ledger = await db.get("stockLedger");
@@ -73,14 +74,13 @@ export default function OfficeDashboardPage() {
       
       const sList = await db.get("suppliers");
       const rList = await db.get("itemGstRates");
-      const iList = await db.get("items");
       const lList = await db.get("legalEntities");
       const uomList = await db.get("uoms");
 
+      setItems(iList);
       setPurchases(pList);
       setSuppliers(sList);
       setItemGstRates(rList);
-      setItems(iList);
       setLegalEntities(lList);
       setUoms(uomList || []);
 

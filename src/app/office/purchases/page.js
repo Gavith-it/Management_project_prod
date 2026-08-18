@@ -37,17 +37,17 @@ export default function PurchasesPage() {
 
   const loadData = async () => {
     try {
+      const iList = await db.get("items");
       const pList = await db.get("purchases");
       const sList = await db.get("suppliers");
       const rList = await db.get("itemGstRates");
-      const iList = await db.get("items");
       const uList = await db.get("uoms");
       const lList = await db.get("legalEntities");
 
+      setItems(iList);
       setPurchases(pList);
       setSuppliers(sList);
       setItemGstRates(rList);
-      setItems(iList);
       setUoms(uList);
       setLegalEntities(lList);
       setLoading(false);

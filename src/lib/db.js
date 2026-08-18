@@ -205,11 +205,15 @@ const fromSnakeCaseRow = (row) => {
       const parts = row.remarks.split(" ||LINES||");
       mapped.remarks = parts[0];
       try {
-        mapped.lines = JSON.parse(parts[1]).map(l => ({
-          ...l,
-          item: l.item === "Zari Yarn" || !l.item ? "Zari thread — 90 count" : l.item,
-          item_code: l.item_code === "ZARI-01" || !l.item_code ? "ZR-001" : l.item_code
-        }));
+        mapped.lines = JSON.parse(parts[1]).map(l => {
+          const matchedItem = localDB.items && localDB.items.find(i => i.name === l.item);
+          const fallbackItem = (localDB.items && localDB.items[0]) || { name: "Zari thread — 90 count", code: "ZR-001" };
+          return {
+            ...l,
+            item: matchedItem ? l.item : fallbackItem.name,
+            item_code: matchedItem ? l.item_code : fallbackItem.code
+          };
+        });
       } catch (e) {
         mapped.lines = [];
       }
@@ -217,10 +221,11 @@ const fromSnakeCaseRow = (row) => {
     
     // If lines array is missing or empty, build a fallback using columns
     if (!mapped.lines || mapped.lines.length === 0) {
+      const fallbackItem = (localDB.items && localDB.items[0]) || { name: "Zari thread — 90 count", code: "ZR-001" };
       mapped.lines = [
         {
-          item: "Zari thread — 90 count", // Default fallback if no lines stored
-          item_code: "ZR-001",
+          item: fallbackItem.name,
+          item_code: fallbackItem.code,
           uom: row.uom || "Bobbin",
           qty: row.qty,
           empty_g: row.empty_per_unit_g,
@@ -274,7 +279,9 @@ export const db = {
     if (supabase && TABLE_COLUMNS[tableName]) {
       const { data, error } = await supabase.from(tableName).select("*");
       if (error) throw error;
-      return (data || []).map(fromSnakeCaseRow);
+      const mappedList = (data || []).map(fromSnakeCaseRow);
+      localDB[key] = mappedList;
+      return mappedList;
     }
 
     return localDB[key] || [];
