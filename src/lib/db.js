@@ -288,6 +288,31 @@ export const db = {
   },
 
   save: async (key, record, idKey = "id", customId = null) => {
+    // Dynamic location code validation to prevent foreign key violations in both staging & prod
+    if (record && record.location) {
+      let locations = localDB.locations || [];
+      if (locations.length === 0 && supabase) {
+        try {
+          const { data } = await supabase.from("locations").select("*");
+          if (data) {
+            locations = data.map(fromSnakeCaseRow);
+            localDB.locations = locations;
+          }
+        } catch (e) {
+          console.error("Failed to fetch locations in save interceptor", e);
+        }
+      }
+      const isValid = locations.some(l => l.code === record.location);
+      if (!isValid) {
+        if (record.location === "STORE-01") {
+          const matched = locations.find(l => /store/i.test(l.name) || /store/i.test(l.code));
+          record.location = matched ? matched.code : (locations[0] ? locations[0].code : null);
+        } else {
+          record.location = null;
+        }
+      }
+    }
+
     // 1. Stocktake special handling
     if (key === "stocktake") {
       const idVal = "STK-CURRENT";
