@@ -25,6 +25,7 @@ export default function ShopfloorPage() {
   const [jobCards, setJobCards] = useState([]);
   const [stageCompletions, setStageCompletions] = useState([]);
   const [lots, setLots] = useState([]);
+  const [items, setItems] = useState([]);
 
   // Form States
   const [formState, setFormState] = useState({});
@@ -34,11 +35,13 @@ export default function ShopfloorPage() {
 
   const loadData = async () => {
     try {
+      const itemsList = await db.get("items");
       const cList = await db.get("carriers");
       const jcList = await db.get("jobCards");
       const scList = await db.get("stageCompletions");
       const lList = await db.get("lots");
 
+      setItems(itemsList);
       setCarriers(cList);
       setJobCards(jcList);
       setStageCompletions(scList);
@@ -130,11 +133,14 @@ export default function ShopfloorPage() {
       await db.save("jobCards", jc, "id");
 
       // Seed Warped Beam Lot
+      const beamItem = items.find(i => i.type === "Beam") || { name: "Warped beam — partial", code: "ZB-001" };
+      const wasteItem = items.find(i => i.type === "Waste") || { name: "Zari waste", code: "ZW-001" };
+
       const newLotId = `LOT-${String((await db.get("lots")).length + 1).padStart(8, "0")}`;
       await db.save("lots", {
         id: newLotId,
-        item: "Warped beam — partial",
-        item_id: "ZB-001",
+        item: beamItem.name,
+        item_id: beamItem.code,
         location: "STORE-01",
         parent: "LOT-00000001",
         source: jc.id,
@@ -152,7 +158,7 @@ export default function ShopfloorPage() {
       await db.save("stockLedger", {
         id: sleId,
         lot: newLotId,
-        item: "Warped beam — partial",
+        item: beamItem.name,
         qty_g: netOutput,
         type: "stage_output",
         ref: jc.id,
@@ -164,7 +170,7 @@ export default function ShopfloorPage() {
       await db.save("wasteEntries", {
         id: wstId,
         stage: "Warping",
-        item: "Zari waste",
+        item: wasteItem.name,
         qty_g: waste,
         ref: jc.id,
         location: "WASTE-01"
@@ -237,11 +243,12 @@ export default function ShopfloorPage() {
       }
 
       // Ledger output
+      const wasteItem = items.find(i => i.type === "Waste") || { name: "Zari waste", code: "ZW-001" };
       const sleId = `SLE-${String((await db.get("stockLedger")).length + 1).padStart(6, "0")}`;
       await db.save("stockLedger", {
         id: sleId,
         lot: targetLotId,
-        item: isRewind ? "Rewound bobbin" : "Pirn — finished",
+        item: targetLot.item,
         qty_g: output,
         type: "stage_output",
         ref: comp.issue_id,
@@ -253,7 +260,7 @@ export default function ShopfloorPage() {
       await db.save("wasteEntries", {
         id: wstId,
         stage: comp.stage,
-        item: "Zari waste",
+        item: wasteItem.name,
         qty_g: waste,
         ref: comp.issue_id,
         location: "WASTE-01"

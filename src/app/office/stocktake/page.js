@@ -23,7 +23,7 @@ export default function StocktakePage() {
   const [locations, setLocations] = useState([]);
 
   // Form States
-  const [selectedLoc, setSelectedLoc] = useState("WARP-01");
+  const [selectedLoc, setSelectedLoc] = useState("");
   const [counts, setCounts] = useState({});
   const [attempted, setAttempted] = useState(false);
   const [submitting, setSubmitting] = useState(false);
@@ -62,6 +62,12 @@ export default function StocktakePage() {
     setUser(activeUser);
     loadData();
   }, []);
+
+  useEffect(() => {
+    if (locations && locations.length > 0 && !selectedLoc) {
+      setSelectedLoc(locations[0].code);
+    }
+  }, [locations, selectedLoc]);
 
   useEffect(() => {
     if (notification) {
@@ -290,9 +296,9 @@ export default function StocktakePage() {
               disabled={!canCount}
               onChange={(e) => setSelectedLoc(e.target.value)}
             >
-              {STOCKTAKE_LOCATIONS.map((loc) => (
-                <option key={loc.id} value={loc.id}>
-                  {loc.label}
+              {locations.map((loc) => (
+                <option key={loc.code} value={loc.code}>
+                  {loc.name} — {loc.code}
                 </option>
               ))}
             </select>

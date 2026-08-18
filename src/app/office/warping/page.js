@@ -36,6 +36,7 @@ export default function WarpingPage() {
   const [warpingClose, setWarpingClose] = useState({});
   const [carriers, setCarriers] = useState([]);
   const [productionSpaces, setProductionSpaces] = useState([]);
+  const [items, setItems] = useState([]);
 
   // Form States
   const [formState, setFormState] = useState({});
@@ -49,6 +50,7 @@ export default function WarpingPage() {
 
   const loadData = async () => {
     try {
+      const itemsList = await db.get("items");
       const lList = await db.get("lots");
       const iList = await db.get("productionIssues");
       const jcList = await db.get("jobCards");
@@ -58,6 +60,7 @@ export default function WarpingPage() {
       const cList = await db.get("carriers");
       const pSpaces = await db.get("productionSpaces");
 
+      setItems(itemsList);
       setLots(lList);
       setIssues(iList);
       setJobCards(jcList);
@@ -97,7 +100,12 @@ export default function WarpingPage() {
 
   // --- TAB 1: ISSUE MATERIAL LOGIC ---
   const getIssuableLots = () => {
-    return lots.filter((l) => /thread/i.test(l.item));
+    const rawZariItems = items.filter(i => i.type === "Raw zari").map(i => i.name);
+    return lots.filter((l) => rawZariItems.includes(l.item) || /thread/i.test(l.item) || /jari/i.test(l.item));
+  };
+
+  const getRawZariItem = () => {
+    return items.find(i => i.type === "Raw zari") || { name: "Zari thread — 90 count", code: "ZR-001" };
   };
 
   const getLotAvailableG = (lotId) => {
@@ -511,8 +519,8 @@ export default function WarpingPage() {
 
         await db.save("lots", {
           id: newLotId,
-          item: "Zari thread — 90 count",
-          item_id: "ZR-001",
+          item: getRawZariItem().name,
+          item_id: getRawZariItem().code,
           location: "STORE-01",
           parent: null,
           source: ret.id,
@@ -533,7 +541,7 @@ export default function WarpingPage() {
         await db.save("stockLedger", {
           id: sleId,
           lot: newLotId,
-          item: "Zari thread — 90 count",
+          item: getRawZariItem().name,
           qty_g: ret.net_g,
           type: "return_receipt",
           ref: ret.id,
@@ -560,7 +568,7 @@ export default function WarpingPage() {
           await db.save("stockLedger", {
             id: sleId,
             lot: "LOT-00000001",
-            item: "Zari thread — 90 count",
+            item: getRawZariItem().name,
             qty_g: -warpingClose.variance_g,
             type: "variance_writeoff",
             ref: "ISS-000044",
@@ -588,7 +596,7 @@ export default function WarpingPage() {
           await db.save("stockLedger", {
             id: sleId,
             lot: "LOT-00000001",
-            item: "Zari thread — 90 count",
+            item: getRawZariItem().name,
             qty_g: warpingClose.variance_g,
             type: "reversal",
             ref: "ISS-000044",

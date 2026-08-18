@@ -390,9 +390,10 @@ export default function RewindPirnPage() {
 
     setSubmitting(true);
     try {
-      const outputItem = isPirn ? "Pirn — finished" : "Rewound bobbin";
-      const wasteItem = "Zari waste";
-      const outputItemRec = items.find((i) => i.name === outputItem);
+      const outputItemRec = items.find((i) => i.type === (isPirn ? "Pirn" : "Rewound bobbin"));
+      const outputItem = outputItemRec ? outputItemRec.name : (isPirn ? "Pirn — finished" : "Rewound bobbin");
+      const wasteItemRec = items.find((i) => i.type === "Waste");
+      const wasteItem = wasteItemRec ? wasteItemRec.name : "Zari waste";
 
       const sourceLot = isPirn ? sourceOutputLot : lots.find((l) => l.id === (source.lines && source.lines[0]?.lot)) || {};
       const targetLocation = isPirn ? "PIRN-03" : "REW-02";
