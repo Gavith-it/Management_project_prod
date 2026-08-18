@@ -63,6 +63,12 @@ export default function StocktakePage() {
     loadData();
   }, []);
 
+  useEffect(() => {
+    if (notification) {
+      window.scrollTo({ top: 0, behavior: "smooth" });
+    }
+  }, [notification]);
+
   const handleStartCount = async () => {
     setSubmitting(true);
     try {

@@ -273,7 +273,7 @@ export default function OfficeDashboardPage() {
     setSubmitting(true);
     try {
       const calc = computePurchaseTotals(formState, suppliers, itemGstRates, ourStateCode());
-      const selectedItem = items.find((i) => i.name === formState.item) || items[0] || { name: "Zari Yarn", code: "ZARI-01" };
+      const selectedItem = items.find((i) => i.name === formState.item) || items[0] || { name: "Zari thread — 90 count", code: "ZR-001" };
 
       // Format Purchase Head
       const pId = `PUR-${String(12 + purchases.length).padStart(6, "0")}`;
