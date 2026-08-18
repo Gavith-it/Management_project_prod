@@ -110,15 +110,15 @@ export function computePurchaseTotals(form, suppliers, itemGstRates, ourStateCod
   };
 }
 
-export function issueLineComputedNet(lot, f) {
+export function issueLineComputedNet(lot, f, prefix = 'il_') {
   if (!lot) return { uom: null, net_g: 0 };
   const uom = lot.piece_uom;
   if (uom === 'Mark') {
-    const marks = Number(f.il_marks || 0);
+    const marks = Number(f[prefix + 'marks'] || 0);
     const bobbins = marks * MARK_TO_BOBBIN;
-    const gross = Number(f.il_gross || 0);
-    const crate = Number(f.il_crate || 0);
-    const bw = Number(f.il_bw || 0);
+    const gross = Number(f[prefix + 'gross'] || 0);
+    const crate = Number(f[prefix + 'crate'] || 0);
+    const bw = Number(f[prefix + 'bw'] || 0);
     return {
       uom: 'Mark',
       marks,
@@ -130,10 +130,10 @@ export function issueLineComputedNet(lot, f) {
     };
   }
   if (uom === 'Bobbin') {
-    const bobbins = Number(f.il_bobbins || 0);
-    const gross = Number(f.il_gross || 0);
-    const crate = Number(f.il_crate || 0);
-    const bw = Number(f.il_bw || 0);
+    const bobbins = Number(f[prefix + 'bobbins'] || 0);
+    const gross = Number(f[prefix + 'gross'] || 0);
+    const crate = Number(f[prefix + 'crate'] || 0);
+    const bw = Number(f[prefix + 'bw'] || 0);
     return {
       uom: 'Bobbin',
       bobbins,
@@ -143,7 +143,7 @@ export function issueLineComputedNet(lot, f) {
       net_g: gross - crate - bobbins * bw
     };
   }
-  return { uom: uom || 'Grams', net_g: Number(f.il_qty_g || 0) };
+  return { uom: uom || 'Grams', net_g: Number(f[prefix + 'qty_g'] || 0) };
 }
 
 // Formatting helpers
