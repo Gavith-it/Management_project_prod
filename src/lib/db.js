@@ -206,8 +206,9 @@ const fromSnakeCaseRow = (row) => {
       mapped.remarks = parts[0];
       try {
         mapped.lines = JSON.parse(parts[1]).map(l => {
-          const matchedItem = localDB.items && localDB.items.find(i => i.name === l.item);
-          const fallbackItem = (localDB.items && localDB.items[0]) || { name: "Zari thread — 90 count", code: "ZR-001" };
+          const itemsList = localDB.itemsFetched ? (localDB.items || []) : [];
+          const matchedItem = itemsList.find(i => i.name === l.item);
+          const fallbackItem = itemsList[0] || { name: "Zari thread — 90 count", code: "ZR-001" };
           return {
             ...l,
             item: matchedItem ? l.item : fallbackItem.name,
@@ -221,7 +222,8 @@ const fromSnakeCaseRow = (row) => {
     
     // If lines array is missing or empty, build a fallback using columns
     if (!mapped.lines || mapped.lines.length === 0) {
-      const fallbackItem = (localDB.items && localDB.items[0]) || { name: "Zari thread — 90 count", code: "ZR-001" };
+      const itemsList = localDB.itemsFetched ? (localDB.items || []) : [];
+      const fallbackItem = itemsList[0] || { name: "Zari thread — 90 count", code: "ZR-001" };
       mapped.lines = [
         {
           item: fallbackItem.name,
@@ -281,6 +283,12 @@ export const db = {
       if (error) throw error;
       const mappedList = (data || []).map(fromSnakeCaseRow);
       localDB[key] = mappedList;
+      if (key === "items") {
+        localDB.itemsFetched = true;
+      }
+      if (key === "locations") {
+        localDB.locationsFetched = true;
+      }
       return mappedList;
     }
 
@@ -291,12 +299,14 @@ export const db = {
     // Dynamic location code validation to prevent foreign key violations in both staging & prod
     if (record && record.location) {
       let locations = localDB.locations || [];
-      if (locations.length === 0 && supabase) {
+      const hasFetchedLocations = localDB.locationsFetched;
+      if ((locations.length === 0 || !hasFetchedLocations) && supabase) {
         try {
           const { data } = await supabase.from("locations").select("*");
           if (data) {
             locations = data.map(fromSnakeCaseRow);
             localDB.locations = locations;
+            localDB.locationsFetched = true;
           }
         } catch (e) {
           console.error("Failed to fetch locations in save interceptor", e);
