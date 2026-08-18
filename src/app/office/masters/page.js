@@ -61,6 +61,12 @@ export default function MastersPage() {
     loadData();
   }, []);
 
+  useEffect(() => {
+    if (notification) {
+      window.scrollTo({ top: 0, behavior: "smooth" });
+    }
+  }, [notification]);
+
   const handleScrollTo = (targetId) => {
     const el = document.getElementById(targetId);
     if (el) {

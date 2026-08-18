@@ -75,6 +75,12 @@ export default function RewindPirnPage() {
     loadData();
   }, []);
 
+  useEffect(() => {
+    if (notification) {
+      window.scrollTo({ top: 0, behavior: "smooth" });
+    }
+  }, [notification]);
+
   const handleReasonChange = (compId, val) => {
     setReasons({ ...reasons, [compId]: val });
   };

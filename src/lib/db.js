@@ -205,7 +205,11 @@ const fromSnakeCaseRow = (row) => {
       const parts = row.remarks.split(" ||LINES||");
       mapped.remarks = parts[0];
       try {
-        mapped.lines = JSON.parse(parts[1]);
+        mapped.lines = JSON.parse(parts[1]).map(l => ({
+          ...l,
+          item: l.item === "Zari Yarn" || !l.item ? "Zari thread — 90 count" : l.item,
+          item_code: l.item_code === "ZARI-01" || !l.item_code ? "ZR-001" : l.item_code
+        }));
       } catch (e) {
         mapped.lines = [];
       }
@@ -215,8 +219,8 @@ const fromSnakeCaseRow = (row) => {
     if (!mapped.lines || mapped.lines.length === 0) {
       mapped.lines = [
         {
-          item: "Zari Yarn", // Default fallback if no lines stored
-          item_code: "ZARI-01",
+          item: "Zari thread — 90 count", // Default fallback if no lines stored
+          item_code: "ZR-001",
           uom: row.uom || "Bobbin",
           qty: row.qty,
           empty_g: row.empty_per_unit_g,

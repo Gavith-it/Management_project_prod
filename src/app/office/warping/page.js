@@ -79,6 +79,12 @@ export default function WarpingPage() {
     loadData();
   }, []);
 
+  useEffect(() => {
+    if (notification) {
+      window.scrollTo({ top: 0, behavior: "smooth" });
+    }
+  }, [notification]);
+
   // Update URL query parameter when tab changes
   const handleTabChange = (tabId) => {
     setActiveTab(tabId);
