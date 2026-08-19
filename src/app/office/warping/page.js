@@ -713,6 +713,9 @@ export default function WarpingPage() {
         <button className={activeTab === "issue" ? "active" : ""} onClick={() => handleTabChange("issue")}>
           Issue material
         </button>
+        <button className={activeTab === "issuelog" ? "active" : ""} onClick={() => handleTabChange("issuelog")}>
+          Issue log
+        </button>
         <button className={activeTab === "jobcards" ? "active" : ""} onClick={() => handleTabChange("jobcards")}>
           Job cards
         </button>
@@ -944,6 +947,16 @@ export default function WarpingPage() {
           )}
 
           <hr className="divider" />
+          <div className="field">
+            <label>Issue date</label>
+            <input
+              type="date"
+              disabled
+              value={formState.issue_date || todayISO()}
+              style={{ background: "var(--neutral-100)", cursor: "not-allowed" }}
+            />
+            <div className="hint">Automatically assigned to today's date.</div>
+          </div>
           <div className={`field ${attempted && formErrors.issue_to_name ? "has-error" : ""}`}>
             <label>Issued to (name) <span className="req">*</span></label>
             <input
@@ -990,6 +1003,99 @@ export default function WarpingPage() {
             <span className="l">Weighing</span>
             <span className="num">5,000.000 g</span>
           </div>
+        </div>
+      )}
+
+      {/* --- ISSUE LOG TAB --- */}
+      {activeTab === "issuelog" && (
+        <div style={{ display: "flex", flexDirection: "column", gap: "16px" }}>
+          <div className="page-head" style={{ marginBottom: "0px" }}>
+            <h2>Production Issue Log</h2>
+          </div>
+
+          {issues.length === 0 ? (
+            <div className="card empty-state">
+              <Icon name="alert" size={32} style={{ color: "var(--neutral-400)" }} />
+              <div className="title">No material issues found</div>
+              <div className="small">Issue material to see log entries.</div>
+            </div>
+          ) : (
+            issues
+              .slice()
+              .sort((a, b) => b.id.localeCompare(a.id))
+              .map((issue) => {
+                const linkedJcs = jobCards.filter((jc) => jc.issue_id === issue.id);
+                return (
+                  <div className="card" key={issue.id} style={{ borderLeft: "4px solid var(--primary-500)", padding: "16px" }}>
+                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", flexWrap: "wrap", gap: "12px", borderBottom: "1px solid var(--neutral-200)", paddingBottom: "12px", marginBottom: "12px" }}>
+                      <div>
+                        <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                          <span style={{ fontWeight: 700, fontSize: "16px", color: "var(--neutral-800)" }}>{issue.id}</span>
+                          <span className="chip chip-success" style={{ textTransform: "uppercase", fontSize: "11px", height: "auto", padding: "2px 8px" }}>{issue.status}</span>
+                        </div>
+                        <div className="muted" style={{ fontSize: "12.5px", marginTop: "4px" }}>
+                          Issued on <strong>{issue.date || "—"}</strong> to operator <strong>{issue.operator || "—"}</strong> on machine <strong>{issue.machine || "—"}</strong>
+                        </div>
+                      </div>
+                      <div style={{ textAlign: "right" }}>
+                        <div className="muted" style={{ fontSize: "11px", textTransform: "uppercase" }}>Total Net Issued</div>
+                        <div style={{ fontSize: "20px", fontWeight: 700, color: "var(--primary-800)", marginTop: "2px" }}>{fmtG(issue.qty_g)} g</div>
+                      </div>
+                    </div>
+
+                    {issue.remarks && (
+                      <div style={{ background: "var(--neutral-50)", padding: "8px 12px", borderRadius: "6px", fontSize: "13px", color: "var(--neutral-700)", marginBottom: "16px" }}>
+                        <strong>Remarks:</strong> {issue.remarks}
+                      </div>
+                    )}
+
+                    <div>
+                      <div style={{ fontWeight: 600, fontSize: "13px", color: "var(--neutral-600)", marginBottom: "8px", textTransform: "uppercase", letterSpacing: "0.5px" }}>
+                        Linked Job Cards ({linkedJcs.length})
+                      </div>
+                      {linkedJcs.length === 0 ? (
+                        <div style={{ color: "var(--neutral-500)", fontSize: "12.5px", fontStyle: "italic", background: "var(--neutral-50)", padding: "8px 12px", borderRadius: "6px" }}>
+                          No job cards created for this issue yet.
+                        </div>
+                      ) : (
+                        <div className="table-wrap" style={{ marginTop: "4px" }}>
+                          <table>
+                            <thead>
+                              <tr>
+                                <th>Job Card ID</th>
+                                <th>Saree Design</th>
+                                <th>Loom No</th>
+                                <th>Operator</th>
+                                <th>Carrier (Beam)</th>
+                                <th>Output (g)</th>
+                                <th>Status</th>
+                              </tr>
+                            </thead>
+                            <tbody>
+                              {linkedJcs.map((jc) => (
+                                <tr key={jc.id}>
+                                  <td><strong style={{ color: "var(--neutral-800)" }}>{jc.id}</strong></td>
+                                  <td>{jc.saree_design || "—"}</td>
+                                  <td>{jc.loom_no || "—"}</td>
+                                  <td>{jc.operator || "—"}</td>
+                                  <td><span className="chip" style={{ fontSize: "11.5px" }}>{jc.carrier || "—"}</span></td>
+                                  <td>{jc.output_g ? `${fmtG(jc.output_g)} g` : "—"}</td>
+                                  <td>
+                                    <span className={`chip ${jc.status === "complete" ? "chip-success" : "chip-warning"}`}>
+                                      {jc.status}
+                                    </span>
+                                  </td>
+                                </tr>
+                              ))}
+                            </tbody>
+                          </table>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                );
+              })
+          )}
         </div>
       )}
 
