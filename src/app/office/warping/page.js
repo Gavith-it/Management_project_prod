@@ -104,7 +104,10 @@ export default function WarpingPage() {
   // --- TAB 1: ISSUE MATERIAL LOGIC ---
   const getIssuableLots = () => {
     const rawZariItems = items.filter(i => i.type === "Raw zari").map(i => i.name);
-    return lots.filter((l) => rawZariItems.includes(l.item) || /thread/i.test(l.item) || /jari/i.test(l.item));
+    return lots.filter((l) => 
+      (rawZariItems.includes(l.item) || /thread/i.test(l.item) || /jari/i.test(l.item)) &&
+      getLotAvailableG(l.id) > 0
+    );
   };
 
   const getRawZariItem = () => {

@@ -187,7 +187,7 @@ export default function RewindPirnPage() {
 
   const stageIssuableLots = (stageName) => {
     const inputItem = stageInputItem(stageName);
-    return lots.filter((l) => l.item === inputItem);
+    return lots.filter((l) => l.item === inputItem && getLotAvailableG(l.id) > 0);
   };
 
   const rewindSourceLots = (sourceType) => {
