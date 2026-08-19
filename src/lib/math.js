@@ -88,7 +88,9 @@ export function computePurchaseTotals(form, suppliers, itemGstRates, ourStateCod
     igst = taxableBase * (gstPct / 100);
   }
 
-  const total = taxableBase + cgst + sgst + igst;
+  const unroundedTotal = taxableBase + cgst + sgst + igst;
+  const total = Math.round(unroundedTotal);
+  const roundOff = total - unroundedTotal;
 
   return {
     uom,
@@ -108,6 +110,7 @@ export function computePurchaseTotals(form, suppliers, itemGstRates, ourStateCod
     cgst,
     sgst,
     igst,
+    roundOff,
     total
   };
 }

@@ -678,6 +678,23 @@ export default function PurchasesPage() {
                   </div>
                 )}
 
+                {(() => {
+                  const activeRoundOff = Number(activePurchase.total || 0) - (
+                    Number(activePurchase.taxable || 0) + 
+                    Number(activePurchase.cgst || 0) + 
+                    Number(activePurchase.sgst || 0) + 
+                    Number(activePurchase.igst || 0)
+                  );
+                  return Math.abs(activeRoundOff) > 0.001 ? (
+                    <div className="recon-line">
+                      <span className="l">Round off</span>
+                      <span className="num">
+                        {activeRoundOff < 0 ? `-${fmtMoney(Math.abs(activeRoundOff))}` : `+${fmtMoney(activeRoundOff)}`}
+                      </span>
+                    </div>
+                  ) : null;
+                })()}
+
                 <div className="recon-line" style={{ fontWeight: 500 }}>
                   <span className="l">Total</span>
                   <span className="num">{fmtMoney(activePurchase.total)}</span>
@@ -1091,6 +1108,14 @@ export default function PurchasesPage() {
                       <span className="l" style={{ color: "var(--neutral-600)" }}>Landed cost / gram (est.)</span>
                       <span className="num">{fmtMoney(calc.costPerGram || 0)}</span>
                     </div>
+                    {Math.abs(calc.roundOff || 0) > 0.001 && (
+                      <div className="recon-line" style={{ fontSize: "13px" }}>
+                        <span className="l" style={{ color: "var(--neutral-600)" }}>Round off</span>
+                        <span className="num" style={{ color: "var(--neutral-600)" }}>
+                          {calc.roundOff < 0 ? `-${fmtMoney(Math.abs(calc.roundOff))}` : `+${fmtMoney(calc.roundOff)}`}
+                        </span>
+                      </div>
+                    )}
                     <div className="recon-line" style={{ fontSize: "14px", borderTop: "1px solid var(--neutral-300)", paddingTop: "8px", marginTop: "4px" }}>
                       <span className="l" style={{ fontWeight: 700 }}>Total</span>
                       <span className="num" style={{ fontWeight: 700, fontSize: "15px" }}>{fmtMoney(calc.total || 0)}</span>
