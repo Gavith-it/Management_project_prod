@@ -102,6 +102,10 @@ export default function WarpingPage() {
   };
 
   // --- TAB 1: ISSUE MATERIAL LOGIC ---
+  const getLotAvailableG = (lotId) => {
+    return Math.max(0, db.getLotBalance(lotId));
+  };
+
   const getIssuableLots = () => {
     const rawZariItems = items.filter(i => i.type === "Raw zari").map(i => i.name);
     return lots.filter((l) => 
@@ -167,10 +171,6 @@ export default function WarpingPage() {
       }
     }
   }, [selectedLot, purchases]);
-
-  const getLotAvailableG = (lotId) => {
-    return Math.max(0, db.getLotBalance(lotId));
-  };
 
   const handleIssueLineAdd = () => {
     const activeLotId = formState.issue_lot || getIssuableLots()[0]?.id;
