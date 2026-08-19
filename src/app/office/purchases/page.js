@@ -23,6 +23,7 @@ export default function PurchasesPage() {
   const [items, setItems] = useState([]);
   const [uoms, setUoms] = useState([]);
   const [legalEntities, setLegalEntities] = useState([]);
+  const [carriers, setCarriers] = useState([]);
 
   const [view, setView] = useState("list"); // 'list', 'detail', 'form'
   const [activePurchaseId, setActivePurchaseId] = useState(null);
@@ -43,6 +44,7 @@ export default function PurchasesPage() {
       const rList = await db.get("itemGstRates");
       const uList = await db.get("uoms");
       const lList = await db.get("legalEntities");
+      const cList = await db.get("carriers");
 
       setItems(iList);
       setPurchases(pList);
@@ -50,6 +52,7 @@ export default function PurchasesPage() {
       setItemGstRates(rList);
       setUoms(uList);
       setLegalEntities(lList);
+      setCarriers(cList);
       setLoading(false);
     } catch (e) {
       console.error("Failed to load purchases", e);
@@ -86,16 +89,22 @@ export default function PurchasesPage() {
 
   // Entry functions
   const handleNewClick = () => {
+    setActivePurchaseId(null);
+    const firstItem = items[0] || {};
+    const defaultUom = firstItem.uom || "Bobbin";
+    const matchedCarrier = carriers.find(c => c.type.toLowerCase() === defaultUom.toLowerCase());
+    const defaultEmptyG = matchedCarrier ? String(matchedCarrier.empty_g) : "";
+
     setFormState({
       supplier: suppliers[0]?.name || "",
-      invoice_no: "",
+      invoice_no: "INV - ",
       invoice_date: new Date().toISOString().slice(0, 10),
-      item: items[0]?.name || "",
-      uom: "Bobbin",
+      item: firstItem.name || "",
+      uom: defaultUom,
       bobbins: "",
       qty_g: "",
       rate: "",
-      empty_g: "",
+      empty_g: defaultUom === "Grams" ? "" : defaultEmptyG,
       gross_g: "",
       freight: "",
       remarks: "",
@@ -131,7 +140,8 @@ export default function PurchasesPage() {
   const validateForm = (form) => {
     const errors = {};
     const uom = form.uom || "Bobbin";
-    if (!form.invoice_no?.trim()) {
+    const trimmedInv = (form.invoice_no || "").trim();
+    if (!trimmedInv || trimmedInv === "INV -") {
       errors.invoice_no = "Invoice number is required.";
     } else {
       const dup = purchases.some(
@@ -756,12 +766,19 @@ export default function PurchasesPage() {
                 <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "12px" }}>
                   <div className={`field ${attempted && formErrors.invoice_no ? "has-error" : ""}`}>
                     <label>Invoice no. <span className="req">*</span></label>
-                    <input
-                      type="text"
-                      value={formState.invoice_no}
-                      onChange={(e) => setFormState({ ...formState, invoice_no: e.target.value })}
-                      placeholder="e.g. INV-2202"
-                    />
+                    <div style={{ display: "flex", alignItems: "center" }}>
+                      <span style={{ padding: "8px 12px", background: "var(--neutral-100)", border: "1px solid var(--neutral-300)", borderRight: "none", borderRadius: "6px 0 0 6px", fontSize: "14px", color: "var(--neutral-600)", whiteSpace: "nowrap" }}>INV -</span>
+                      <input
+                        type="text"
+                        style={{ borderRadius: "0 6px 6px 0", flex: 1 }}
+                        placeholder="e.g. 2202"
+                        value={formState.invoice_no ? formState.invoice_no.replace(/^INV\s*-\s*/i, "") : ""}
+                        onChange={(e) => {
+                          const rawVal = e.target.value.replace(/^INV\s*-\s*/i, "");
+                          setFormState({ ...formState, invoice_no: "INV - " + rawVal });
+                        }}
+                      />
+                    </div>
                     {attempted && formErrors.invoice_no && (
                       <div className="field-error-text" style={{ fontSize: "10px", marginTop: "2px" }}>{formErrors.invoice_no}</div>
                     )}
@@ -860,7 +877,19 @@ export default function PurchasesPage() {
                     <label>Item</label>
                     <select
                       value={formState.item}
-                      onChange={(e) => setFormState({ ...formState, item: e.target.value })}
+                      onChange={(e) => {
+                        const newName = e.target.value;
+                        const matchedItem = items.find((i) => i.name === newName) || {};
+                        const newUom = matchedItem.uom || "Bobbin";
+                        const matchedCarrier = carriers.find(c => c.type.toLowerCase() === newUom.toLowerCase());
+                        const defaultEmptyG = matchedCarrier ? String(matchedCarrier.empty_g) : "";
+                        setFormState({
+                          ...formState,
+                          item: newName,
+                          uom: newUom,
+                          empty_g: newUom === "Grams" ? "" : defaultEmptyG
+                        });
+                      }}
                     >
                       {items.map((i, idx) => (
                         <option key={idx} value={i.name}>
@@ -874,7 +903,16 @@ export default function PurchasesPage() {
                     <label>UOM</label>
                     <select
                       value={formState.uom}
-                      onChange={(e) => setFormState({ ...formState, uom: e.target.value })}
+                      onChange={(e) => {
+                        const newUom = e.target.value;
+                        const matchedCarrier = carriers.find(c => c.type.toLowerCase() === newUom.toLowerCase());
+                        const defaultEmptyG = matchedCarrier ? String(matchedCarrier.empty_g) : "";
+                        setFormState({
+                          ...formState,
+                          uom: newUom,
+                          empty_g: newUom === "Grams" ? "" : defaultEmptyG
+                        });
+                      }}
                     >
                       {uoms.map((u) => (
                         <option key={u.id || u.name} value={u.name}>
@@ -942,7 +980,7 @@ export default function PurchasesPage() {
                     </div>
                     <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "12px" }}>
                       <div className={`field ${attempted && formErrors.empty_g ? "has-error" : ""}`}>
-                        <label>Empty weight / {formState.uom.toLowerCase()} (g) <span className="req">*</span></label>
+                        <label>Empty weight / bobbin (g) <span className="req">*</span></label>
                         <input
                           type="number"
                           step="0.001"
@@ -954,7 +992,7 @@ export default function PurchasesPage() {
                         )}
                       </div>
                       <div className={`field ${attempted && formErrors.gross_g ? "has-error" : ""}`}>
-                        <label>Gross weight / {formState.uom.toLowerCase()} (g) <span className="req">*</span></label>
+                        <label>Gross weight / bobbin (g) <span className="req">*</span></label>
                         <input
                           type="number"
                           step="0.001"

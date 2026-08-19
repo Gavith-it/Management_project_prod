@@ -78,7 +78,7 @@ CREATE TABLE IF NOT EXISTS public.production_spaces (
 
 CREATE TABLE IF NOT EXISTS public.carriers (
     code TEXT PRIMARY KEY,
-    type TEXT NOT NULL CHECK (type IN ('Beam', 'Pirn tube', 'Pagadi')),
+    type TEXT NOT NULL,
     empty_g NUMERIC(12,3) NOT NULL
 );
 

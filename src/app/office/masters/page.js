@@ -360,7 +360,7 @@ export default function MastersPage() {
         ],
         fields: [
           { key: "code", label: "Carrier code", type: "text", required: true, placeholder: "e.g. BEAM-21" },
-          { key: "type", label: "Type", type: "select", options: ["Beam", "Pirn tube", "Pagadi"] },
+          { key: "type", label: "Type", type: "select", options: ["Beam", "Pirn tube", "Pagadi", "Bobbin"] },
           { key: "empty_g", label: "Certified empty weight (g)", type: "number", step: "0.001", required: true }
         ],
         validate: (form, id) => {
