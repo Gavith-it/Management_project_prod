@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { db } from "@/lib/db";
 import { getSessionUser } from "@/lib/auth";
@@ -111,7 +111,7 @@ export default function WarpingPage() {
     return items.find(i => i.type === "Raw zari") || { name: "Zari thread — 90 count", code: "ZR-001" };
   };
 
-  const [prevSelectedLotId, setPrevSelectedLotId] = useState("");
+  const prevSelectedLotIdRef = useRef("");
 
   const handleLotChange = (lotId) => {
     const lot = lots.find((l) => l.id === lotId);
@@ -149,11 +149,11 @@ export default function WarpingPage() {
   };
 
   useEffect(() => {
-    if (selectedLot && prevSelectedLotId !== selectedLot.id) {
-      setPrevSelectedLotId(selectedLot.id);
+    if (selectedLot && prevSelectedLotIdRef.current !== selectedLot.id) {
+      prevSelectedLotIdRef.current = selectedLot.id;
       handleLotChange(selectedLot.id);
     }
-  }, [selectedLot, purchases, prevSelectedLotId]);
+  }, [selectedLot, purchases]);
 
   const getLotAvailableG = (lotId) => {
     return Math.max(0, db.getLotBalance(lotId));
