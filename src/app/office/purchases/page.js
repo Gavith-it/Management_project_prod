@@ -148,7 +148,7 @@ export default function PurchasesPage() {
     } else {
       const dup = purchases.some(
         (p) =>
-          p.invoice_no.toLowerCase() === form.invoice_no.trim().toLowerCase() &&
+          (p.invoice_no || "").toLowerCase() === trimmedInv.toLowerCase() &&
           p.supplier === form.supplier &&
           p.id !== form._purchaseId
       );
@@ -241,8 +241,9 @@ export default function PurchasesPage() {
 
       // Format Purchase Head
       const pId = activePurchaseId || `PUR-${String(12 + purchases.length).padStart(6, "0")}`;
-      const batchId = activePurchaseId
-        ? purchases.find((p) => p.id === activePurchaseId).batch
+      const matchedPurchase = activePurchaseId ? purchases.find((p) => p.id === activePurchaseId) : null;
+      const batchId = matchedPurchase
+        ? matchedPurchase.batch
         : `BATCH-${new Date().getFullYear().toString().slice(-2)}-${String(purchases.length + 1).padStart(5, "0")}`;
 
       const newPurchase = {
@@ -772,7 +773,7 @@ export default function PurchasesPage() {
                     <input
                       value={
                         activePurchaseId
-                          ? purchases.find((p) => p.id === activePurchaseId).batch
+                          ? (purchases.find((p) => p.id === activePurchaseId)?.batch || "")
                           : `BATCH-${new Date().getFullYear().toString().slice(-2)}-${String(purchases.length + 1).padStart(5, "0")}`
                       }
                       disabled

@@ -194,7 +194,7 @@ export default function OfficeDashboardPage() {
     } else {
       const dup = purchases.some(
         (p) =>
-          p.invoice_no.toLowerCase() === form.invoice_no.trim().toLowerCase() &&
+          (p.invoice_no || "").toLowerCase() === trimmedInv.toLowerCase() &&
           p.supplier === form.supplier
       );
       if (dup) errors.invoice_no = "This invoice is already recorded.";
