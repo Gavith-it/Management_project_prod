@@ -26,6 +26,8 @@ export default function ShopfloorPage() {
   const [stageCompletions, setStageCompletions] = useState([]);
   const [lots, setLots] = useState([]);
   const [items, setItems] = useState([]);
+  const [issues, setIssues] = useState([]);
+  const [warpingLogs, setWarpingLogs] = useState([]);
 
   // Form States
   const [formState, setFormState] = useState({});
@@ -40,12 +42,16 @@ export default function ShopfloorPage() {
       const jcList = await db.get("jobCards");
       const scList = await db.get("stageCompletions");
       const lList = await db.get("lots");
+      const issuesList = await db.get("productionIssues");
+      const wlList = await db.get("warpingLogs");
 
       setItems(itemsList);
       setCarriers(cList);
       setJobCards(jcList);
       setStageCompletions(scList);
       setLots(lList);
+      setIssues(issuesList);
+      setWarpingLogs(wlList);
       setLoading(false);
     } catch (e) {
       console.error(e);
@@ -63,19 +69,64 @@ export default function ShopfloorPage() {
 
   // --- ACTIONS ---
 
+  const getLinkedBobbins = (jc) => {
+    if (!jc) return 0;
+    const issue = issues.find((i) => i.id === jc.issue_id);
+    if (!issue) return 0;
+    const lot = lots.find((l) => l.id === issue.lot);
+    return lot ? (lot.piece_uom === "Mark" ? lot.qty_pieces * 4 : lot.qty_pieces) : 0;
+  };
+
+  const handleWlJobCardChange = (jcId) => {
+    const jc = jobCards.find((j) => j.id === jcId);
+    if (!jc) return;
+    const carrier = carriers.find((c) => c.code === jc.carrier);
+    setFormState((prev) => ({
+      ...prev,
+      wl_jobcard: jcId,
+      wl_operator: jc.operator || "",
+      wl_ns_a: prev.wl_ns_a || "",
+      wl_fp_a: prev.wl_fp_a || "",
+      wl_eb_a: carrier ? String(carrier.empty_g) : "12400",
+      wl_gross_a: prev.wl_gross_a || "",
+      wl_ns_b: prev.wl_ns_b || "",
+      wl_fp_b: prev.wl_fp_b || "",
+      wl_eb_b: carrier ? String(carrier.empty_g) : "12400",
+      wl_gross_b: prev.wl_gross_b || ""
+    }));
+  };
+
   const handleNav = (targetScreen) => {
     setScreen(targetScreen);
-    setFormState({
-      sf_carrier: carriers[0]?.code || "",
-      sf_filled: "",
-      sf_paper: "",
-      sf_waste: "",
-      sf_output: "",
-      sf_waste2: "",
-      sf_bobbins: "",
-      sf_gross: "",
-      sf_tare: ""
-    });
+    if (targetScreen === "complete" && assignmentKey === "warping") {
+      const inProgressCards = jobCards.filter((jc) => jc.status === "in_progress");
+      const firstJc = inProgressCards[0];
+      const carrier = firstJc ? carriers.find((c) => c.code === firstJc.carrier) : null;
+      setFormState({
+        wl_jobcard: firstJc?.id || "",
+        wl_operator: firstJc?.operator || "",
+        wl_ns_a: "",
+        wl_fp_a: "",
+        wl_eb_a: carrier ? String(carrier.empty_g) : "12400",
+        wl_gross_a: "",
+        wl_ns_b: "",
+        wl_fp_b: "",
+        wl_eb_b: carrier ? String(carrier.empty_g) : "12400",
+        wl_gross_b: ""
+      });
+    } else {
+      setFormState({
+        sf_carrier: carriers[0]?.code || "",
+        sf_filled: "",
+        sf_paper: "",
+        sf_waste: "",
+        sf_output: "",
+        sf_waste2: "",
+        sf_bobbins: "",
+        sf_gross: "",
+        sf_tare: ""
+      });
+    }
     setErrors({});
     setAttempted(false);
   };
@@ -85,98 +136,123 @@ export default function ShopfloorPage() {
     handleNav("home");
   };
 
-  // 1. Submit Single Beam Warping Completion (e.g. completes JC-000004)
+  // 1. Submit Warping Completion (adds warping log, completes JC, creates Side A & Side B beams)
   const handleWarpingSubmit = async (e) => {
     e.preventDefault();
-    const filled = Number(formState.sf_filled || 0);
-    const paper = Number(formState.sf_paper || 0);
-    const waste = Number(formState.sf_waste || 0);
+    const jcId = formState.wl_jobcard;
+    const jc = jobCards.find((j) => j.id === jcId);
+    if (!jc) return;
 
-    const formErrors = {};
-    if (!formState.sf_filled?.trim() || filled <= 0) {
-      formErrors.sf_filled = "Filled weight must be greater than 0.";
-    }
-    if (!formState.sf_paper?.trim() || paper < 0) {
-      formErrors.sf_paper = "Paper weight cannot be negative.";
-    }
-    if (!formErrors.sf_filled && !formErrors.sf_paper && paper >= filled) {
-      formErrors.sf_paper = "Paper weight cannot exceed filled weight.";
-    }
-    if (!formState.sf_waste?.trim() || waste < 0) {
-      formErrors.sf_waste = "Waste weight is required.";
+    if (!formState.wl_operator?.trim()) {
+      setErrors({ wl_operator: "Operator name is required." });
+      setAttempted(true);
+      return;
     }
 
-    if (Object.keys(formErrors).length > 0) {
-      setErrors(formErrors);
+    const grossA = Number(formState.wl_gross_a || 0);
+    const grossB = Number(formState.wl_gross_b || 0);
+    if (grossA <= 0 || grossB <= 0) {
+      setErrors({ wl_gross_a: "Gross weights are required and must be > 0." });
       setAttempted(true);
       return;
     }
 
     setSubmitting(true);
     try {
-      const jc = jobCards.find((j) => j.id === "JC-000004") || jobCards[3];
-      const carrier = carriers.find((c) => c.code === formState.sf_carrier) || carriers[0];
+      const issue = issues.find((i) => i.id === jc.issue_id);
+      const lot = lots.find((l) => l.id === (issue?.lot));
+      const bobbins = lot?.qty_pieces || 0;
 
-      const netOutput = Math.max(0, filled - carrier.empty_g - paper);
-      const consumed = netOutput + waste;
+      const nsA = Number(formState.wl_ns_a || 0);
+      const fpA = Number(formState.wl_fp_a || 0);
+      const ebA = Number(formState.wl_eb_a || 0);
+      const nsB = Number(formState.wl_ns_b || 0);
+      const fpB = Number(formState.wl_fp_b || 0);
+      const ebB = Number(formState.wl_eb_b || 0);
 
-      // Update JC record in DB
+      const netA = Math.round(Math.max(0, grossA - nsA - fpA - ebA));
+      const netB = Math.round(Math.max(0, grossB - nsB - fpB - ebB));
+      const totalNet = netA + netB;
+
+      const wlId = `WL-${String(warpingLogs.length + 1).padStart(6, "0")}`;
+      const newWl = {
+        id: wlId,
+        job_card: jc.id,
+        operator: formState.wl_operator,
+        bobbins,
+        sideA: { net_g: netA },
+        sideB: { net_g: netB },
+        total_net_g: totalNet,
+        waste_g: null
+      };
+
+      await db.save("warpingLogs", newWl, "id", wlId);
+
+      // Update Job Card details
       jc.status = "complete";
-      jc.carrier = carrier.code;
-      jc.empty_g = carrier.empty_g;
-      jc.filled_g = filled;
-      jc.paper_g = paper;
-      jc.output_g = netOutput;
-      jc.waste_g = waste;
-      jc.consumed_g = consumed;
-
+      jc.output_g = totalNet;
+      jc.consumed_g = totalNet;
       await db.save("jobCards", jc, "id");
 
-      // Seed Warped Beam Lot
-      const beamItem = items.find(i => i.type === "Beam") || { name: "Warped beam — partial", code: "ZB-001" };
-      const wasteItem = items.find(i => i.type === "Waste") || { name: "Zari waste", code: "ZW-001" };
+      // Log Stock Ledger outputs
+      const lotAId = `LOT-${String((await db.get("lots")).length + 1).padStart(8, "0")}`;
+      const lotBId = `LOT-${String((await db.get("lots")).length + 2).padStart(8, "0")}`;
 
-      const newLotId = `LOT-${String((await db.get("lots")).length + 1).padStart(8, "0")}`;
       await db.save("lots", {
-        id: newLotId,
-        item: beamItem.name,
-        item_id: beamItem.code,
+        id: lotAId,
+        item: "Warped beam — partial",
+        item_id: "ZB-001",
         location: "STORE-01",
-        parent: "LOT-00000001",
+        parent: lot?.id || null,
         source: jc.id,
-        batch: "BATCH-26-00001",
+        batch: lot?.batch || "BATCH-26-00001",
         qty_pieces: 1,
         piece_uom: "Beam",
         is_mixed_batch: false,
-        carrier_code: carrier.code,
-        landed_cost_per_gram: 10.0,
+        carrier_code: "BEAM-07",
+        landed_cost_per_gram: lot?.landed_cost_per_gram || 10.0,
         status: "available"
-      }, "id", newLotId);
+      }, "id", lotAId);
 
-      // Ledger output
-      const sleId = `SLE-${String((await db.get("stockLedger")).length + 1).padStart(6, "0")}`;
+      await db.save("lots", {
+        id: lotBId,
+        item: "Warped beam — partial",
+        item_id: "ZB-001",
+        location: "STORE-01",
+        parent: lot?.id || null,
+        source: jc.id,
+        batch: lot?.batch || "BATCH-26-00001",
+        qty_pieces: 1,
+        piece_uom: "Beam",
+        is_mixed_batch: false,
+        carrier_code: "BEAM-11",
+        landed_cost_per_gram: lot?.landed_cost_per_gram || 10.0,
+        status: "available"
+      }, "id", lotBId);
+
+      const sleAId = `SLE-${String((await db.get("stockLedger")).length + 1).padStart(6, "0")}`;
       await db.save("stockLedger", {
-        id: sleId,
-        lot: newLotId,
-        item: beamItem.name,
-        qty_g: netOutput,
+        id: sleAId,
+        lot: lotAId,
+        item: "Warped beam — partial",
+        qty_g: netA,
         type: "stage_output",
         ref: jc.id,
         location: "STORE-01"
-      }, "id", sleId);
+      }, "id", sleAId);
 
-      // Seed Waste
-      const wstId = `WST-${String((await db.get("wasteEntries")).length + 1).padStart(6, "0")}`;
-      await db.save("wasteEntries", {
-        id: wstId,
-        stage: "Warping",
-        item: wasteItem.name,
-        qty_g: waste,
+      const sleBId = `SLE-${String((await db.get("stockLedger")).length + 2).padStart(6, "0")}`;
+      await db.save("stockLedger", {
+        id: sleBId,
+        lot: lotBId,
+        item: "Warped beam — partial",
+        qty_g: netB,
+        type: "stage_output",
         ref: jc.id,
-        location: "WASTE-01"
-      }, "id", wstId);
+        location: "STORE-01"
+      }, "id", sleBId);
 
-      // Audit Log
+      // Audit log
       const actor = `${user.name} · ${user.roleLabel}`;
       await db.save("auditLog", {
         ts: new Date().toLocaleTimeString(),
@@ -361,6 +437,24 @@ export default function ShopfloorPage() {
     return <div className="small muted">Loading terminal details...</div>;
   }
 
+  const warpingJc = jobCards.find((j) => j.id === formState.wl_jobcard);
+  const bobbinsCount = getLinkedBobbins(warpingJc);
+  const emptyBobbinsG = bobbinsCount * 16.0;
+
+  const nsA = Number(formState.wl_ns_a || 0);
+  const fpA = Number(formState.wl_fp_a || 0);
+  const ebA = Number(formState.wl_eb_a || 0);
+  const grossA = Number(formState.wl_gross_a || 0);
+  const netA = Math.round(Math.max(0, grossA - nsA - fpA - ebA));
+
+  const nsB = Number(formState.wl_ns_b || 0);
+  const fpB = Number(formState.wl_fp_b || 0);
+  const ebB = Number(formState.wl_eb_b || 0);
+  const grossB = Number(formState.wl_gross_b || 0);
+  const netB = Math.round(Math.max(0, grossB - nsB - fpB - ebB));
+
+  const totalConsumed = netA + netB;
+
   return (
     <>
       {screen === "home" && (
@@ -423,80 +517,216 @@ export default function ShopfloorPage() {
           {activeAssignment.type === "jobcard" ? (
             <form onSubmit={handleWarpingSubmit}>
               <h2 style={{ fontSize: "17px", marginBottom: "4px" }}>
-                Complete production — JC-000004
+                New warping log
               </h2>
-              <div className="small muted" style={{ marginBottom: "16px" }}>
-                Border warp · 150 ends · 200 m · 44 in
-              </div>
-
-              <div className="sf-field">
-                <label>Beam</label>
-                <select
-                  value={formState.sf_carrier}
-                  onChange={(e) => setFormState({ ...formState, sf_carrier: e.target.value })}
-                >
-                  {carriers.map((c) => (
-                    <option key={c.code} value={c.code}>
-                      {c.code}
-                    </option>
-                  ))}
-                </select>
-              </div>
-
-              <div className="sf-field">
-                <label>Empty weight (g)</label>
+              <div style={{ display: "flex", justifyContent: "flex-end", width: "100%", marginTop: "-28px", marginBottom: "16px" }}>
                 <input
-                  value={fmtG(carriers.find((c) => c.code === formState.sf_carrier)?.empty_g || 12400)}
+                  type="date"
+                  value={todayISO()}
                   disabled
+                  style={{ width: "120px", fontSize: "12px", padding: "4px", border: "1px solid var(--neutral-300)", borderRadius: "4px" }}
                 />
-                <div className="hint">Certified weight from master files.</div>
               </div>
 
-              <div className={`sf-field ${attempted && errors.sf_filled ? "has-error" : ""}`}>
-                <label>Filled weight (g)</label>
-                <input
-                  type="number"
-                  placeholder="0.000"
-                  value={formState.sf_filled}
-                  onChange={(e) => setFormState({ ...formState, sf_filled: e.target.value })}
-                />
-                {attempted && errors.sf_filled && (
-                  <div className="sf-field-error-text">{errors.sf_filled}</div>
+              <div className="sf-field">
+                <label>Job card</label>
+                {jobCards.filter((jc) => jc.status === "in_progress").length === 0 ? (
+                  <div style={{ color: "var(--danger-600)", fontSize: "13px", fontWeight: 600 }}>
+                    No active in-progress job cards! Create a job card first.
+                  </div>
+                ) : (
+                  <select
+                    value={formState.wl_jobcard}
+                    onChange={(e) => handleWlJobCardChange(e.target.value)}
+                  >
+                    {jobCards
+                      .filter((jc) => jc.status === "in_progress")
+                      .map((jc) => (
+                        <option key={jc.id} value={jc.id}>
+                          {jc.id} — {jc.saree_design} ({jc.operator})
+                        </option>
+                      ))}
+                  </select>
                 )}
               </div>
 
-              <div className={`sf-field ${attempted && errors.sf_paper ? "has-error" : ""}`}>
-                <label>Paper weight (g)</label>
+              <div className={`sf-field ${attempted && errors.wl_operator ? "has-error" : ""}`}>
+                <label>Operator name <span className="req">*</span></label>
                 <input
-                  type="number"
-                  placeholder="0.000"
-                  value={formState.sf_paper}
-                  onChange={(e) => setFormState({ ...formState, sf_paper: e.target.value })}
+                  type="text"
+                  placeholder="e.g. Operator name"
+                  value={formState.wl_operator}
+                  onChange={(e) => setFormState({ ...formState, wl_operator: e.target.value })}
                 />
-                {attempted && errors.sf_paper && (
-                  <div className="sf-field-error-text">{errors.sf_paper}</div>
+                {attempted && errors.wl_operator && (
+                  <div className="sf-field-error-text">{errors.wl_operator}</div>
                 )}
               </div>
 
-              <div className={`sf-field ${attempted && errors.sf_waste ? "has-error" : ""}`}>
-                <label>Waste (g)</label>
-                <input
-                  type="number"
-                  placeholder="0.000"
-                  value={formState.sf_waste}
-                  onChange={(e) => setFormState({ ...formState, sf_waste: e.target.value })}
-                />
-                {attempted && errors.sf_waste && (
-                  <div className="sf-field-error-text">{errors.sf_waste}</div>
-                )}
+              <div style={{ fontWeight: 600, fontSize: "12px", color: "var(--neutral-500)", marginTop: "16px", textTransform: "uppercase", letterSpacing: "0.5px" }}>
+                Before Winding
+              </div>
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "12px", marginTop: "8px" }}>
+                <div className="sf-field">
+                  <label>No. of bobbins</label>
+                  <input
+                    type="number"
+                    value={bobbinsCount}
+                    disabled
+                    style={{ background: "var(--neutral-100)", cursor: "not-allowed" }}
+                  />
+                  <div className="hint" style={{ fontSize: "10px", marginTop: "2px", color: "var(--neutral-500)" }}>From linked issue</div>
+                </div>
+                <div className="sf-field">
+                  <label>Empty bobbins total (g)</label>
+                  <input
+                    type="number"
+                    value={emptyBobbinsG}
+                    disabled
+                    style={{ background: "var(--neutral-100)", cursor: "not-allowed" }}
+                  />
+                  <div className="hint" style={{ fontSize: "10px", marginTop: "2px", color: "var(--neutral-500)" }}>Count × 16.0 g</div>
+                </div>
               </div>
 
-              <div className="sf-calc-note">
-                Output and consumed quantities are computed on save.
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "16px", marginTop: "16px" }}>
+                {/* Side A */}
+                <div style={{ background: "var(--neutral-50)", border: "1px solid var(--neutral-200)", borderRadius: "8px", padding: "12px" }}>
+                  <div style={{ fontWeight: 700, fontSize: "12px", color: "var(--primary-700)", marginBottom: "8px", textTransform: "uppercase" }}>
+                    BEAM / SIDE A
+                  </div>
+                  <div className="sf-field">
+                    <label style={{ fontSize: "11px" }}>Newspaper A (g)</label>
+                    <input
+                      type="number"
+                      placeholder="0"
+                      value={formState.wl_ns_a}
+                      onChange={(e) => setFormState({ ...formState, wl_ns_a: e.target.value })}
+                    />
+                  </div>
+                  <div className="sf-field">
+                    <label style={{ fontSize: "11px" }}>Fruity paper A (g)</label>
+                    <input
+                      type="number"
+                      placeholder="0"
+                      value={formState.wl_fp_a}
+                      onChange={(e) => setFormState({ ...formState, wl_fp_a: e.target.value })}
+                    />
+                  </div>
+                  <div className="sf-field">
+                    <label style={{ fontSize: "11px" }}>Empty beam weight A (g)</label>
+                    <input
+                      type="number"
+                      placeholder="0"
+                      value={formState.wl_eb_a}
+                      onChange={(e) => setFormState({ ...formState, wl_eb_a: e.target.value })}
+                    />
+                  </div>
+                </div>
+
+                {/* Side B */}
+                <div style={{ background: "var(--neutral-50)", border: "1px solid var(--neutral-200)", borderRadius: "8px", padding: "12px" }}>
+                  <div style={{ fontWeight: 700, fontSize: "12px", color: "var(--primary-700)", marginBottom: "8px", textTransform: "uppercase" }}>
+                    BEAM / SIDE B
+                  </div>
+                  <div className="sf-field">
+                    <label style={{ fontSize: "11px" }}>Newspaper B (g)</label>
+                    <input
+                      type="number"
+                      placeholder="0"
+                      value={formState.wl_ns_b}
+                      onChange={(e) => setFormState({ ...formState, wl_ns_b: e.target.value })}
+                    />
+                  </div>
+                  <div className="sf-field">
+                    <label style={{ fontSize: "11px" }}>Fruity paper B (g)</label>
+                    <input
+                      type="number"
+                      placeholder="0"
+                      value={formState.wl_fp_b}
+                      onChange={(e) => setFormState({ ...formState, wl_fp_b: e.target.value })}
+                    />
+                  </div>
+                  <div className="sf-field">
+                    <label style={{ fontSize: "11px" }}>Empty beam weight B (g)</label>
+                    <input
+                      type="number"
+                      placeholder="0"
+                      value={formState.wl_eb_b}
+                      onChange={(e) => setFormState({ ...formState, wl_eb_b: e.target.value })}
+                    />
+                  </div>
+                </div>
               </div>
 
-              <button type="submit" className="btn btn-primary btn-lg btn-block" disabled={submitting}>
-                {submitting ? "Submitting..." : "Submit"}
+              <div style={{ fontWeight: 600, fontSize: "12px", color: "var(--neutral-500)", marginTop: "16px", textTransform: "uppercase", letterSpacing: "0.5px" }}>
+                After Winding
+              </div>
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "12px", marginTop: "8px" }}>
+                <div className={`sf-field ${attempted && errors.wl_gross_a ? "has-error" : ""}`}>
+                  <label>Gross weight A (g) <span className="req">*</span></label>
+                  <input
+                    type="number"
+                    placeholder="0"
+                    value={formState.wl_gross_a}
+                    onChange={(e) => setFormState({ ...formState, wl_gross_a: e.target.value })}
+                  />
+                  {attempted && errors.wl_gross_a && (
+                    <div className="sf-field-error-text">{errors.wl_gross_a}</div>
+                  )}
+                </div>
+                <div className={`sf-field ${attempted && errors.wl_gross_b ? "has-error" : ""}`}>
+                  <label>Gross weight B (g) <span className="req">*</span></label>
+                  <input
+                    type="number"
+                    placeholder="0"
+                    value={formState.wl_gross_b}
+                    onChange={(e) => setFormState({ ...formState, wl_gross_b: e.target.value })}
+                  />
+                  {attempted && errors.wl_gross_b && (
+                    <div className="sf-field-error-text">{errors.wl_gross_b}</div>
+                  )}
+                </div>
+              </div>
+
+              <div style={{ fontWeight: 600, fontSize: "12px", color: "var(--neutral-500)", marginTop: "16px", textTransform: "uppercase", letterSpacing: "0.5px" }}>
+                Result
+              </div>
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "12px", marginTop: "8px" }}>
+                <div style={{ background: "var(--warning-50)", border: "1px solid var(--warning-200)", borderRadius: "8px", padding: "12px" }}>
+                  <div style={{ fontSize: "10px", fontWeight: 700, color: "var(--warning-700)", textTransform: "uppercase" }}>
+                    Net Zari Consumed A
+                  </div>
+                  <div style={{ fontSize: "18px", fontWeight: 700, marginTop: "4px" }}>
+                    {netA} g
+                  </div>
+                </div>
+                <div style={{ background: "var(--warning-50)", border: "1px solid var(--warning-200)", borderRadius: "8px", padding: "12px" }}>
+                  <div style={{ fontSize: "10px", fontWeight: 700, color: "var(--warning-700)", textTransform: "uppercase" }}>
+                    Net Zari Consumed B
+                  </div>
+                  <div style={{ fontSize: "18px", fontWeight: 700, marginTop: "4px" }}>
+                    {netB} g
+                  </div>
+                </div>
+              </div>
+
+              <div style={{ background: "var(--primary-50)", border: "1px solid var(--primary-200)", borderRadius: "8px", padding: "12px", marginTop: "12px" }}>
+                <div style={{ fontSize: "11px", fontWeight: 700, color: "var(--primary-700)", textTransform: "uppercase" }}>
+                  Total Net Zari Consumed (A + B)
+                </div>
+                <div style={{ fontSize: "22px", fontWeight: 700, marginTop: "4px", color: "var(--primary-800)" }}>
+                  {totalConsumed} g
+                </div>
+              </div>
+
+              <button
+                type="submit"
+                className="btn btn-primary btn-lg btn-block"
+                style={{ marginTop: "16px" }}
+                disabled={submitting || jobCards.filter((jc) => jc.status === "in_progress").length === 0}
+              >
+                {submitting ? "Submitting..." : "Submit log"}
               </button>
             </form>
           ) : (

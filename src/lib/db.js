@@ -173,7 +173,9 @@ const COLUMN_FIELD_MAP = {
   roleLabel: "role_label",
   finalizedAt: "finalized_at",
   approvedAt: "approved_at",
-  approvedBy: "approved_by"
+  approvedBy: "approved_by",
+  sideA: "side_a",
+  sideB: "side_b"
 };
 
 const isUUID = (str) => /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/.test(String(str));
@@ -198,6 +200,8 @@ const fromSnakeCaseRow = (row) => {
   if (row.finalized_at !== undefined) mapped.finalizedAt = row.finalized_at;
   if (row.approved_at !== undefined) mapped.approvedAt = row.approved_at;
   if (row.approved_by !== undefined) mapped.approvedBy = row.approved_by;
+  if (row.side_a !== undefined) mapped.sideA = row.side_a;
+  if (row.side_b !== undefined) mapped.sideB = row.side_b;
 
   // Reconstruct lines array for purchases from serialized remarks or default columns
   if (row.invoice_no !== undefined) {
