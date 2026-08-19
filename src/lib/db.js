@@ -233,7 +233,7 @@ const fromSnakeCaseRow = (row) => {
           empty_g: row.empty_per_unit_g,
           gross_g: row.gross_per_unit_g,
           net_g: row.net_g,
-          rate: `₹${(row.rate_per_unit || 0).toFixed(2)} / ${(row.uom || "bobbin").toLowerCase()}`
+          rate: `₹${(Number(row.rate_per_unit || 0)).toFixed(2)} / ${(row.uom || "bobbin").toLowerCase()}`
         }
       ];
     }

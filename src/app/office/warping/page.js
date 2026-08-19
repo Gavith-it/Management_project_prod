@@ -111,7 +111,11 @@ export default function WarpingPage() {
     return items.find(i => i.type === "Raw zari") || { name: "Zari thread — 90 count", code: "ZR-001" };
   };
 
+  const selectedLotId = formState.issue_lot || getIssuableLots()[0]?.id;
+  const selectedLot = lots.find((l) => l.id === selectedLotId) || getIssuableLots()[0];
+
   const prevSelectedLotIdRef = useRef("");
+  const prevPurchasesLengthRef = useRef(0);
 
   const handleLotChange = (lotId) => {
     const lot = lots.find((l) => l.id === lotId);
@@ -149,9 +153,15 @@ export default function WarpingPage() {
   };
 
   useEffect(() => {
-    if (selectedLot && prevSelectedLotIdRef.current !== selectedLot.id) {
-      prevSelectedLotIdRef.current = selectedLot.id;
-      handleLotChange(selectedLot.id);
+    if (selectedLot) {
+      const lotChanged = prevSelectedLotIdRef.current !== selectedLot.id;
+      const purchasesLoaded = prevPurchasesLengthRef.current === 0 && purchases.length > 0;
+
+      if (lotChanged || purchasesLoaded) {
+        prevSelectedLotIdRef.current = selectedLot.id;
+        prevPurchasesLengthRef.current = purchases.length;
+        handleLotChange(selectedLot.id);
+      }
     }
   }, [selectedLot, purchases]);
 
@@ -678,8 +688,6 @@ export default function WarpingPage() {
   const isSupervisor = role === "inv_sup" || role === "admin";
   const canAdminApprove = role === "admin";
 
-  const selectedLotId = formState.issue_lot || getIssuableLots()[0]?.id;
-  const selectedLot = lots.find((l) => l.id === selectedLotId) || getIssuableLots()[0];
   const lotAvailable = selectedLot ? getLotAvailableG(selectedLot.id) : 0;
   const alreadyStaged = (formState.issue_lines || []).filter((l) => l.lot === selectedLotId).reduce((s, l) => s + l.net_g, 0);
   const remainingInSelectedLot = lotAvailable - alreadyStaged;
