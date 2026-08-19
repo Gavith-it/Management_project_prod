@@ -241,7 +241,7 @@ export default function PurchasesPage() {
       const pId = activePurchaseId || `PUR-${String(12 + purchases.length).padStart(6, "0")}`;
       const batchId = activePurchaseId
         ? purchases.find((p) => p.id === activePurchaseId).batch
-        : `BATCH-${String(purchases.length + 1).padStart(5, "0")}`;
+        : `BATCH-${new Date().getFullYear().toString().slice(-2)}-${String(purchases.length + 1).padStart(5, "0")}`;
 
       const newPurchase = {
         id: pId,
@@ -754,7 +754,7 @@ export default function PurchasesPage() {
                       value={
                         activePurchaseId
                           ? purchases.find((p) => p.id === activePurchaseId).batch
-                          : `BATCH-${String(purchases.length + 1).padStart(5, "0")}`
+                          : `BATCH-${new Date().getFullYear().toString().slice(-2)}-${String(purchases.length + 1).padStart(5, "0")}`
                       }
                       disabled
                     />
