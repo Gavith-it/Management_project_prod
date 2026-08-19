@@ -379,7 +379,7 @@ export default function RewindPirnPage() {
     const gross = Number(f[prefix + "_gross"] || 0);
     const crate = Number(f[prefix + "_crate"] || 0);
     const bw = Number(f[prefix + "_bw"] || 0);
-    const net = isPirn ? Math.max(0, gross - crate) : Math.max(0, gross - crate - (pieces * bw));
+    const net = Math.round(isPirn ? Math.max(0, gross - crate) : Math.max(0, gross - crate - (pieces * bw)));
     const waste = Number(f[prefix + "_waste"] || 0);
 
     const invalid = !source || !String(f[prefix + "_pieces"] || "").trim() || pieces <= 0 || !Number.isInteger(pieces) ||
@@ -528,7 +528,7 @@ export default function RewindPirnPage() {
   const compGross = Number(formState[prefix + "_gross"] || 0);
   const compCrate = Number(formState[prefix + "_crate"] || 0);
   const compBw = Number(formState[prefix + "_bw"] || 0);
-  const compNet = isPirn ? Math.max(0, compGross - compCrate) : Math.max(0, compGross - compCrate - (compPieces * compBw));
+  const compNet = Math.round(isPirn ? Math.max(0, compGross - compCrate) : Math.max(0, compGross - compCrate - (compPieces * compBw)));
   const compWaste = Number(formState[prefix + "_waste"] || 0);
   const compVariance = compSource ? compIssuedAvailable - compNet - compWaste : 0;
 

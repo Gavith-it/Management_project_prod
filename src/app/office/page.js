@@ -162,7 +162,9 @@ export default function OfficeDashboardPage() {
   const handleNewPurchaseClick = () => {
     const firstItem = items[0] || {};
     const defaultUom = firstItem.uom || "Bobbin";
-    const matchedCarrier = carriers.find(c => c.type.toLowerCase() === defaultUom.toLowerCase());
+    const isBobbinOrMark = defaultUom.toLowerCase() === "bobbin" || defaultUom.toLowerCase() === "mark";
+    const lookupType = isBobbinOrMark ? "bobbin" : defaultUom.toLowerCase();
+    const matchedCarrier = carriers.find(c => c.type.toLowerCase() === lookupType);
     const defaultEmptyG = matchedCarrier ? String(matchedCarrier.empty_g) : "";
 
     setFormState({
@@ -663,7 +665,9 @@ export default function OfficeDashboardPage() {
                         const newName = e.target.value;
                         const matchedItem = items.find((i) => i.name === newName) || {};
                         const newUom = matchedItem.uom || "Bobbin";
-                        const matchedCarrier = carriers.find(c => c.type.toLowerCase() === newUom.toLowerCase());
+                        const isBobbinOrMark = newUom.toLowerCase() === "bobbin" || newUom.toLowerCase() === "mark";
+                        const lookupType = isBobbinOrMark ? "bobbin" : newUom.toLowerCase();
+                        const matchedCarrier = carriers.find(c => c.type.toLowerCase() === lookupType);
                         const defaultEmptyG = matchedCarrier ? String(matchedCarrier.empty_g) : "";
                         setFormState({
                           ...formState,
@@ -687,7 +691,9 @@ export default function OfficeDashboardPage() {
                       value={formState.uom}
                       onChange={(e) => {
                         const newUom = e.target.value;
-                        const matchedCarrier = carriers.find(c => c.type.toLowerCase() === newUom.toLowerCase());
+                        const isBobbinOrMark = newUom.toLowerCase() === "bobbin" || newUom.toLowerCase() === "mark";
+                        const lookupType = isBobbinOrMark ? "bobbin" : newUom.toLowerCase();
+                        const matchedCarrier = carriers.find(c => c.type.toLowerCase() === lookupType);
                         const defaultEmptyG = matchedCarrier ? String(matchedCarrier.empty_g) : "";
                         setFormState({
                           ...formState,

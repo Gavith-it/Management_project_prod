@@ -71,7 +71,7 @@ export function computePurchaseTotals(form, suppliers, itemGstRates, ourStateCod
     qty = Number(form.bobbins || 0);
     ratePerUnit = Number(form.rate || 0);
     netPerUnit = Math.max(0, gross - empty);
-    totalNet = netPerUnit * qty;
+    totalNet = Math.round(netPerUnit * qty);
     taxableItem = ratePerUnit * qty;
   }
 
@@ -128,7 +128,7 @@ export function issueLineComputedNet(lot, f, prefix = 'il_') {
       gross_g: gross,
       crate_g: crate,
       bobbin_weight_g: bw,
-      net_g: gross - crate - bobbins * bw
+      net_g: Math.round(gross - crate - bobbins * bw)
     };
   }
   if (uom === 'Bobbin') {
@@ -142,7 +142,7 @@ export function issueLineComputedNet(lot, f, prefix = 'il_') {
       gross_g: gross,
       crate_g: crate,
       bobbin_weight_g: bw,
-      net_g: gross - crate - bobbins * bw
+      net_g: Math.round(gross - crate - bobbins * bw)
     };
   }
   return { uom: uom || 'Grams', net_g: Number(f[prefix + 'qty_g'] || 0) };
