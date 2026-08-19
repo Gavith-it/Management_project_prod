@@ -120,7 +120,7 @@ export function issueLineComputedNet(lot, f, prefix = 'il_') {
     const bobbins = marks * MARK_TO_BOBBIN;
     const gross = Number(f[prefix + 'gross'] || 0);
     const crate = Number(f[prefix + 'crate'] || 0);
-    const bw = Number(f[prefix + 'bw'] || 0);
+    const bw = f[prefix + 'bw'] !== undefined && f[prefix + 'bw'] !== "" ? Number(f[prefix + 'bw']) : BOBBIN_TARE_REF_G;
     return {
       uom: 'Mark',
       marks,
@@ -135,7 +135,7 @@ export function issueLineComputedNet(lot, f, prefix = 'il_') {
     const bobbins = Number(f[prefix + 'bobbins'] || 0);
     const gross = Number(f[prefix + 'gross'] || 0);
     const crate = Number(f[prefix + 'crate'] || 0);
-    const bw = Number(f[prefix + 'bw'] || 0);
+    const bw = f[prefix + 'bw'] !== undefined && f[prefix + 'bw'] !== "" ? Number(f[prefix + 'bw']) : BOBBIN_TARE_REF_G;
     return {
       uom: 'Bobbin',
       bobbins,

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { db } from "@/lib/db";
 import { getSessionUser } from "@/lib/auth";
@@ -37,6 +37,7 @@ export default function WarpingPage() {
   const [carriers, setCarriers] = useState([]);
   const [productionSpaces, setProductionSpaces] = useState([]);
   const [items, setItems] = useState([]);
+  const [purchases, setPurchases] = useState([]);
 
   // Form States
   const [formState, setFormState] = useState({});
@@ -51,6 +52,7 @@ export default function WarpingPage() {
   const loadData = async () => {
     try {
       const itemsList = await db.get("items");
+      const pList = await db.get("purchases");
       const lList = await db.get("lots");
       const iList = await db.get("productionIssues");
       const jcList = await db.get("jobCards");
@@ -61,6 +63,7 @@ export default function WarpingPage() {
       const pSpaces = await db.get("productionSpaces");
 
       setItems(itemsList);
+      setPurchases(pList);
       setLots(lList);
       setIssues(iList);
       setJobCards(jcList);
@@ -107,6 +110,60 @@ export default function WarpingPage() {
   const getRawZariItem = () => {
     return items.find(i => i.type === "Raw zari") || { name: "Zari thread — 90 count", code: "ZR-001" };
   };
+
+  const selectedLotId = formState.issue_lot || getIssuableLots()[0]?.id;
+  const selectedLot = lots.find((l) => l.id === selectedLotId) || getIssuableLots()[0];
+
+  const prevSelectedLotIdRef = useRef("");
+  const prevPurchasesLengthRef = useRef(0);
+
+  const handleLotChange = (lotId) => {
+    const lot = lots.find((l) => l.id === lotId);
+    if (lot) {
+      const p = purchases.find((x) => x.id === lot.source);
+      if (p) {
+        const isMark = p.uom === "Mark";
+        const emptyPerBobbin = Number(p.empty_per_unit_g || 0) / (isMark ? MARK_TO_BOBBIN : 1);
+        const grossPerUnit = Number(p.gross_per_unit_g || 0) || (Number(p.net_g || 0) / Number(p.qty || 1) + Number(p.empty_per_unit_g || 0));
+        const totalGross = grossPerUnit * Number(p.qty || 0);
+
+        setFormState((prev) => ({
+          ...prev,
+          issue_lot: lotId,
+          il_marks: isMark ? p.qty : "",
+          il_bobbins: isMark ? "" : p.qty,
+          il_gross: totalGross,
+          il_crate: 0,
+          il_bw: emptyPerBobbin
+        }));
+      } else {
+        setFormState((prev) => ({
+          ...prev,
+          issue_lot: lotId,
+          il_marks: lot.piece_uom === "Mark" ? lot.qty_pieces : "",
+          il_bobbins: lot.piece_uom === "Bobbin" ? lot.qty_pieces : "",
+          il_gross: "",
+          il_crate: 0,
+          il_bw: BOBBIN_TARE_REF_G
+        }));
+      }
+    } else {
+      setFormState((prev) => ({ ...prev, issue_lot: lotId }));
+    }
+  };
+
+  useEffect(() => {
+    if (selectedLot) {
+      const lotChanged = prevSelectedLotIdRef.current !== selectedLot.id;
+      const purchasesLoaded = prevPurchasesLengthRef.current === 0 && purchases.length > 0;
+
+      if (lotChanged || purchasesLoaded) {
+        prevSelectedLotIdRef.current = selectedLot.id;
+        prevPurchasesLengthRef.current = purchases.length;
+        handleLotChange(selectedLot.id);
+      }
+    }
+  }, [selectedLot, purchases]);
 
   const getLotAvailableG = (lotId) => {
     return Math.max(0, db.getLotBalance(lotId));
@@ -631,8 +688,6 @@ export default function WarpingPage() {
   const isSupervisor = role === "inv_sup" || role === "admin";
   const canAdminApprove = role === "admin";
 
-  const selectedLotId = formState.issue_lot || getIssuableLots()[0]?.id;
-  const selectedLot = lots.find((l) => l.id === selectedLotId) || getIssuableLots()[0];
   const lotAvailable = selectedLot ? getLotAvailableG(selectedLot.id) : 0;
   const alreadyStaged = (formState.issue_lines || []).filter((l) => l.lot === selectedLotId).reduce((s, l) => s + l.net_g, 0);
   const remainingInSelectedLot = lotAvailable - alreadyStaged;
@@ -679,7 +734,7 @@ export default function WarpingPage() {
             </div>
           )}
 
-          <div className="field">
+          <div className={`field ${lineCalc.net_g > remainingInSelectedLot ? "has-error" : ""}`}>
             <label>Approved batch</label>
             <select
               value={selectedLotId}
@@ -692,6 +747,11 @@ export default function WarpingPage() {
                 </option>
               ))}
             </select>
+            {lineCalc.net_g > remainingInSelectedLot && (
+              <div className="field-error-text" style={{ marginTop: "4px", fontSize: "11px", display: "flex", alignItems: "center", gap: "4px" }}>
+                <span>⚠️ Calculated net weight ({fmtG(lineCalc.net_g)} g) exceeds the remaining lot balance of {fmtG(remainingInSelectedLot)} g!</span>
+              </div>
+            )}
           </div>
 
           {selectedLot?.piece_uom === "Mark" ? (
