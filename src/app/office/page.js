@@ -284,7 +284,7 @@ export default function OfficeDashboardPage() {
 
       // Format Purchase Head
       const pId = `PUR-${String(12 + purchases.length).padStart(6, "0")}`;
-      const batchId = `BATCH-2627-${String(purchases.length + 1).padStart(5, "0")}`;
+      const batchId = `BATCH-${String(purchases.length + 1).padStart(5, "0")}`;
 
       const newPurchase = {
         id: pId,
@@ -536,7 +536,7 @@ export default function OfficeDashboardPage() {
                   <div className="field">
                     <label>Batch ID</label>
                     <input
-                      value={`BATCH-2627-${String(purchases.length + 1).padStart(5, "0")}`}
+                      value={`BATCH-${String(purchases.length + 1).padStart(5, "0")}`}
                       disabled
                     />
                     <div className="hint">Auto-assigned and sequential — not editable.</div>

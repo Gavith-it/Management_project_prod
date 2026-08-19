@@ -144,7 +144,7 @@ export default function ShopfloorPage() {
         location: "STORE-01",
         parent: "LOT-00000001",
         source: jc.id,
-        batch: "BATCH-2627-00001",
+        batch: "BATCH-00001",
         qty_pieces: 1,
         piece_uom: "Beam",
         is_mixed_batch: false,
