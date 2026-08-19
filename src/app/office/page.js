@@ -162,7 +162,9 @@ export default function OfficeDashboardPage() {
   const handleNewPurchaseClick = () => {
     const firstItem = items[0] || {};
     const defaultUom = firstItem.uom || "Bobbin";
-    const matchedCarrier = carriers.find(c => c.type.toLowerCase() === defaultUom.toLowerCase());
+    const isBobbinOrMark = defaultUom.toLowerCase() === "bobbin" || defaultUom.toLowerCase() === "mark";
+    const lookupType = isBobbinOrMark ? "bobbin" : defaultUom.toLowerCase();
+    const matchedCarrier = carriers.find(c => c.type.toLowerCase() === lookupType);
     const defaultEmptyG = matchedCarrier ? String(matchedCarrier.empty_g) : "";
 
     setFormState({
@@ -663,7 +665,9 @@ export default function OfficeDashboardPage() {
                         const newName = e.target.value;
                         const matchedItem = items.find((i) => i.name === newName) || {};
                         const newUom = matchedItem.uom || "Bobbin";
-                        const matchedCarrier = carriers.find(c => c.type.toLowerCase() === newUom.toLowerCase());
+                        const isBobbinOrMark = newUom.toLowerCase() === "bobbin" || newUom.toLowerCase() === "mark";
+                        const lookupType = isBobbinOrMark ? "bobbin" : newUom.toLowerCase();
+                        const matchedCarrier = carriers.find(c => c.type.toLowerCase() === lookupType);
                         const defaultEmptyG = matchedCarrier ? String(matchedCarrier.empty_g) : "";
                         setFormState({
                           ...formState,
@@ -687,7 +691,9 @@ export default function OfficeDashboardPage() {
                       value={formState.uom}
                       onChange={(e) => {
                         const newUom = e.target.value;
-                        const matchedCarrier = carriers.find(c => c.type.toLowerCase() === newUom.toLowerCase());
+                        const isBobbinOrMark = newUom.toLowerCase() === "bobbin" || newUom.toLowerCase() === "mark";
+                        const lookupType = isBobbinOrMark ? "bobbin" : newUom.toLowerCase();
+                        const matchedCarrier = carriers.find(c => c.type.toLowerCase() === lookupType);
                         const defaultEmptyG = matchedCarrier ? String(matchedCarrier.empty_g) : "";
                         setFormState({
                           ...formState,
@@ -867,6 +873,14 @@ export default function OfficeDashboardPage() {
                       <span className="l" style={{ color: "var(--neutral-600)" }}>Landed cost / gram (est.)</span>
                       <span className="num">{fmtMoney(calc.costPerGram || 0)}</span>
                     </div>
+                    {Math.abs(calc.roundOff || 0) > 0.001 && (
+                      <div className="recon-line" style={{ fontSize: "13px" }}>
+                        <span className="l" style={{ color: "var(--neutral-600)" }}>Round off</span>
+                        <span className="num" style={{ color: "var(--neutral-600)" }}>
+                          {calc.roundOff < 0 ? `-${fmtMoney(Math.abs(calc.roundOff))}` : `+${fmtMoney(calc.roundOff)}`}
+                        </span>
+                      </div>
+                    )}
                     <div className="recon-line" style={{ fontSize: "14px", borderTop: "1px solid var(--neutral-300)", paddingTop: "8px", marginTop: "4px" }}>
                       <span className="l" style={{ fontWeight: 700 }}>Total</span>
                       <span className="num" style={{ fontWeight: 700, fontSize: "15px" }}>{fmtMoney(calc.total || 0)}</span>

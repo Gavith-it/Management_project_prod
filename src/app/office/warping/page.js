@@ -358,8 +358,8 @@ export default function WarpingPage() {
       const fpB = Number(formState.wl_fp_b || 0);
       const ebB = Number(formState.wl_eb_b || 0);
 
-      const netA = Math.max(0, grossA - nsA - fpA - ebA);
-      const netB = Math.max(0, grossB - nsB - fpB - ebB);
+      const netA = Math.round(Math.max(0, grossA - nsA - fpA - ebA));
+      const netB = Math.round(Math.max(0, grossB - nsB - fpB - ebB));
       const totalNet = netA + netB;
 
       const wlId = `WL-${String(warpingLogs.length + 1).padStart(6, "0")}`;
