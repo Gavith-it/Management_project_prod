@@ -194,7 +194,7 @@ export default function OfficeDashboardPage() {
     } else {
       const dup = purchases.some(
         (p) =>
-          p.invoice_no.toLowerCase() === form.invoice_no.trim().toLowerCase() &&
+          (p.invoice_no || "").toLowerCase() === trimmedInv.toLowerCase() &&
           p.supplier === form.supplier
       );
       if (dup) errors.invoice_no = "This invoice is already recorded.";
@@ -272,7 +272,11 @@ export default function OfficeDashboardPage() {
     setFormErrors(errors);
     setAttempted(true);
 
-    if (Object.keys(errors).length > 0) return;
+    if (Object.keys(errors).length > 0) {
+      const modalScrollable = document.querySelector(".modal-card") || document.querySelector(".modal-body") || window;
+      modalScrollable.scrollTo({ top: 0, behavior: "smooth" });
+      return;
+    }
 
     if (isSubmit) {
       const confirmed = window.confirm("Are you sure you want to submit this purchase? Once submitted, it cannot be edited later.");
@@ -893,6 +897,16 @@ export default function OfficeDashboardPage() {
                     <Icon name="alert" size={14} style={{ color: "var(--warning-600)", flexShrink: 0 }} />
                     <span>Once submitted, this purchase is posted to the ledger and cannot be edited.</span>
                   </div>
+                  {attempted && Object.keys(formErrors).length > 0 && (
+                    <div style={{ display: "flex", alignItems: "center", gap: "6px", color: "var(--danger-700)", fontSize: "12px", fontWeight: 600, marginTop: "12px", background: "var(--danger-50)", border: "1px solid var(--danger-200)", padding: "8px 12px", borderRadius: "6px" }}>
+                      <Icon name="alert" size={14} style={{ color: "var(--danger-600)", flexShrink: 0 }} />
+                      <span>
+                        {formErrors.invoice_no === "This invoice is already recorded."
+                          ? "Duplicate Invoice: This supplier invoice number is already recorded in the system."
+                          : "Form has validation errors. Please scroll up to correct the red highlighted fields."}
+                      </span>
+                    </div>
+                  )}
                 </div>
               </div>
 
